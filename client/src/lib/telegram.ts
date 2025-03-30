@@ -1,0 +1,268 @@
+// Telegram Mini App SDK wrapper
+import { getUserByTelegramId, createUser } from './firebase';
+import { nanoid } from 'nanoid';
+import { User } from '@/types';
+
+// Define WebApp interface based on Telegram documentation
+declare global {
+  interface Window {
+    Telegram: {
+      WebApp: {
+        ready(): void;
+        initData: string;
+        initDataUnsafe: {
+          query_id?: string;
+          user?: {
+            id: number;
+            first_name: string;
+            last_name?: string;
+            username?: string;
+            language_code?: string;
+            photo_url?: string;
+          };
+          auth_date: number;
+          hash: string;
+        };
+        sendData(data: string): void;
+        expand(): void;
+        close(): void;
+        MainButton: {
+          text: string;
+          color: string;
+          textColor: string;
+          isVisible: boolean;
+          isActive: boolean;
+          isProgressVisible: boolean;
+          show(): void;
+          hide(): void;
+          enable(): void;
+          disable(): void;
+          showProgress(leaveActive: boolean): void;
+          hideProgress(): void;
+          onClick(callback: () => void): void;
+          offClick(callback: () => void): void;
+          setText(text: string): void;
+          setParams(params: {
+            text?: string;
+            color?: string;
+            text_color?: string;
+            is_active?: boolean;
+            is_visible?: boolean;
+          }): void;
+        };
+        BackButton: {
+          isVisible: boolean;
+          show(): void;
+          hide(): void;
+          onClick(callback: () => void): void;
+          offClick(callback: () => void): void;
+        };
+        openLink(url: string): void;
+        openTelegramLink(url: string): void;
+        openInvoice(url: string, callback?: (status: string) => void): void;
+        showPopup(params: {
+          title?: string;
+          message: string;
+          buttons?: Array<{
+            id: string;
+            type?: "default" | "ok" | "close" | "cancel" | "destructive";
+            text: string;
+          }>;
+        }, callback?: (buttonId: string) => void): void;
+        showAlert(message: string, callback?: () => void): void;
+        showConfirm(message: string, callback?: (isConfirmed: boolean) => void): void;
+        HapticFeedback: {
+          impactOccurred(style: "light" | "medium" | "heavy" | "rigid" | "soft"): void;
+          notificationOccurred(type: "error" | "success" | "warning"): void;
+          selectionChanged(): void;
+        };
+        isVersionAtLeast(version: string): boolean;
+        setHeaderColor(color: string): void;
+        setBackgroundColor(color: string): void;
+        enableClosingConfirmation(): void;
+        disableClosingConfirmation(): void;
+        onEvent(eventType: string, eventHandler: Function): void;
+        offEvent(eventType: string, eventHandler: Function): void;
+        setViewportHeight(height: number): void;
+        requestViewport(): void;
+        requestWriteAccess(callback?: (access_granted: boolean) => void): void;
+        requestContact(callback?: (shared_contact: boolean) => void): void;
+        CloudStorage: {
+          getItem(key: string, callback?: (error: Error | null, value: string | null) => void): Promise<string | null>;
+          setItem(key: string, value: string, callback?: (error: Error | null, success: boolean) => void): Promise<boolean>;
+          removeItem(key: string, callback?: (error: Error | null, success: boolean) => void): Promise<boolean>;
+          getItems(keys: string[], callback?: (error: Error | null, values: { [key: string]: string | null }) => void): Promise<{ [key: string]: string | null }>;
+          removeItems(keys: string[], callback?: (error: Error | null, success: boolean) => void): Promise<boolean>;
+          getKeys(callback?: (error: Error | null, keys: string[]) => void): Promise<string[]>;
+        };
+      };
+    };
+  }
+}
+
+// Check if we are in a Telegram WebApp environment
+export function isTelegramWebApp(): boolean {
+  return window.Telegram && window.Telegram.WebApp ? true : false;
+}
+
+// Initialize and setup the Telegram Mini App
+export function initializeTelegramApp(): void {
+  if (isTelegramWebApp()) {
+    // Inform Telegram that our app is ready
+    window.Telegram.WebApp.ready();
+    // Set dark theme colors for app
+    window.Telegram.WebApp.setHeaderColor('#121212');
+    window.Telegram.WebApp.setBackgroundColor('#121212');
+    // Expand to take full screen if needed
+    window.Telegram.WebApp.expand();
+  } else {
+    console.warn('Not running inside Telegram WebApp');
+  }
+}
+
+// Get current Telegram user
+export function getTelegramUser(): {
+  telegramId: string;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  photoUrl?: string;
+} | null {
+  if (!isTelegramWebApp() || !window.Telegram.WebApp.initDataUnsafe.user) {
+    return null;
+  }
+
+  const user = window.Telegram.WebApp.initDataUnsafe.user;
+
+  return {
+    telegramId: user.id.toString(),
+    firstName: user.first_name,
+    lastName: user.last_name,
+    username: user.username,
+    photoUrl: user.photo_url
+  };
+}
+
+// Get or create a user in Firebase based on Telegram data
+export async function authenticateTelegramUser(referralCode?: string): Promise<User | null> {
+  const telegramUser = getTelegramUser();
+  
+  if (!telegramUser) {
+    console.error('No Telegram user found');
+    return null;
+  }
+  
+  try {
+    // Check if user exists in Firebase
+    let user = await getUserByTelegramId(telegramUser.telegramId);
+    
+    // If user doesn't exist, create a new one
+    if (!user) {
+      // Generate a unique referral code
+      const newReferralCode = nanoid(8);
+      
+      user = await createUser({
+        telegramId: telegramUser.telegramId,
+        firstName: telegramUser.firstName,
+        lastName: telegramUser.lastName,
+        username: telegramUser.username,
+        photoUrl: telegramUser.photoUrl,
+        referralCode: newReferralCode,
+        referredBy: referralCode
+      });
+    }
+    
+    return user;
+  } catch (error) {
+    console.error('Error authenticating Telegram user:', error);
+    return null;
+  }
+}
+
+// Show an alert using Telegram's native UI
+export function showAlert(message: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (isTelegramWebApp()) {
+      window.Telegram.WebApp.showAlert(message, () => {
+        resolve();
+      });
+    } else {
+      alert(message);
+      resolve();
+    }
+  });
+}
+
+// Show a confirmation dialog using Telegram's native UI
+export function showConfirm(message: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (isTelegramWebApp()) {
+      window.Telegram.WebApp.showConfirm(message, (isConfirmed) => {
+        resolve(isConfirmed);
+      });
+    } else {
+      const result = confirm(message);
+      resolve(result);
+    }
+  });
+}
+
+// Open a Telegram channel or group
+export function openTelegramLink(link: string): void {
+  if (isTelegramWebApp()) {
+    window.Telegram.WebApp.openTelegramLink(link);
+  } else {
+    window.open(link, '_blank');
+  }
+}
+
+// Handle payment using Telegram's payment API
+export function openInvoice(url: string): Promise<string> {
+  return new Promise((resolve) => {
+    if (isTelegramWebApp()) {
+      window.Telegram.WebApp.openInvoice(url, (status) => {
+        resolve(status);
+      });
+    } else {
+      console.warn('Telegram payment not available outside WebApp');
+      resolve('failed');
+    }
+  });
+}
+
+// Share data with Telegram (like referral code)
+export function shareWithTelegram(data: string): void {
+  if (isTelegramWebApp()) {
+    window.Telegram.WebApp.sendData(data);
+  } else {
+    console.warn('Sharing not available outside WebApp');
+  }
+}
+
+// Request a contact from user
+export function requestContact(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (isTelegramWebApp()) {
+      window.Telegram.WebApp.requestContact((shared) => {
+        resolve(shared);
+      });
+    } else {
+      console.warn('Contact request not available outside WebApp');
+      resolve(false);
+    }
+  });
+}
+
+// Provide haptic feedback
+export function hapticFeedback(type: 'success' | 'error' | 'warning'): void {
+  if (isTelegramWebApp()) {
+    window.Telegram.WebApp.HapticFeedback.notificationOccurred(type);
+  }
+}
+
+// Close the WebApp
+export function closeWebApp(): void {
+  if (isTelegramWebApp()) {
+    window.Telegram.WebApp.close();
+  }
+}
