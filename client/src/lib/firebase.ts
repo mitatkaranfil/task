@@ -372,18 +372,36 @@ export async function getAllTasks(): Promise<Task[]> {
 
 export async function createTask(taskData: Partial<Task>): Promise<Task | null> {
   try {
+    console.log("Creating task with data:", JSON.stringify(taskData));
     const tasksRef = collection(db, "tasks");
-    const docRef = await addDoc(tasksRef, {
+    
+    // Ensure all required fields are present
+    const taskToSave = {
       ...taskData,
+      title: taskData.title || "",
+      description: taskData.description || "",
+      type: taskData.type || "daily",
+      points: taskData.points || 0,
+      requiredAmount: taskData.requiredAmount || 1,
+      isActive: taskData.isActive !== undefined ? taskData.isActive : true,
       createdAt: serverTimestamp()
-    });
+    };
+    
+    console.log("Saving task data:", JSON.stringify(taskToSave));
+    const docRef = await addDoc(tasksRef, taskToSave);
+    console.log("Task created with ID:", docRef.id);
     
     return {
       id: docRef.id,
-      ...taskData
+      ...taskToSave
     } as Task;
   } catch (error) {
     console.error("Error creating task:", error);
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error("Error details:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     return null;
   }
 }
@@ -540,18 +558,39 @@ export async function getAllBoostTypes(): Promise<BoostType[]> {
 
 export async function createBoostType(boostData: Partial<BoostType>): Promise<BoostType | null> {
   try {
+    console.log("Creating boost type with data:", JSON.stringify(boostData));
     const boostTypesRef = collection(db, "boostTypes");
-    const docRef = await addDoc(boostTypesRef, {
+    
+    // Ensure all required fields are present
+    const boostToSave = {
       ...boostData,
+      name: boostData.name || "",
+      description: boostData.description || "",
+      multiplier: boostData.multiplier || 150,
+      durationHours: boostData.durationHours || 24,
+      price: boostData.price || 500,
+      isActive: boostData.isActive !== undefined ? boostData.isActive : true,
+      iconName: boostData.iconName || "rocket",
+      colorClass: boostData.colorClass || "blue",
+      isPopular: boostData.isPopular !== undefined ? boostData.isPopular : false,
       createdAt: serverTimestamp()
-    });
+    };
+    
+    console.log("Saving boost data:", JSON.stringify(boostToSave));
+    const docRef = await addDoc(boostTypesRef, boostToSave);
+    console.log("Boost type created with ID:", docRef.id);
     
     return {
       id: docRef.id,
-      ...boostData
+      ...boostToSave
     } as BoostType;
   } catch (error) {
     console.error("Error creating boost type:", error);
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error("Error details:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     return null;
   }
 }
