@@ -1,5 +1,5 @@
 [build]
-  command = "npm install vite@5.0.12 @vitejs/plugin-react typescript && npx vite build"
+  command = "npm install && node build.js"
   publish = "client/dist"
 
 [dev]
