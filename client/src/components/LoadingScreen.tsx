@@ -6,7 +6,7 @@ interface LoadingScreenProps {
 }
 
 const LoadingScreen: React.FC<LoadingScreenProps> = ({ 
-  message = "Telegram'a bağlanıyor...",
+  message = "Uygulama yükleniyor...",
   timeout = 15000
 }) => {
   const [showRetryButton, setShowRetryButton] = useState(false);

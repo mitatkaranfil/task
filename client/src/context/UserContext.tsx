@@ -303,7 +303,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   };
 
   if (isLoading && !user) {
-    return <LoadingScreen message="Telegram'a bağlanıyor..." />;
+    return <LoadingScreen message="Kullanıcı bilgileri yükleniyor..." />;
   }
 
   return (

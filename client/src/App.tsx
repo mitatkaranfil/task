@@ -30,6 +30,8 @@ function App() {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [telegramStatus, setTelegramStatus] = useState<{success: boolean, message: string} | null>(null);
+  const [showTelegramStatus, setShowTelegramStatus] = useState(false);
 
   useEffect(() => {
     // Check network status immediately
@@ -40,18 +42,9 @@ function App() {
       try {
         console.log(`Uygulama başlatılıyor... (Deneme ${retryCount + 1})`);
         
-        // Initialize Telegram WebApp first (fast operation)
-        initializeTelegramApp();
-        
-        // Use a short timeout for the entire initialization process
-        const initTimeout = setTimeout(() => {
-          console.log("Zaman aşımı - yine de devam ediliyor");
-          setIsInitialized(true);
-          setIsOfflineMode(true);
-        }, 2000); // Only wait 2 seconds max
-        
+        // Start Firebase initialization immediately rather than waiting for Telegram
         try {
-          // Initialize Firebase with even shorter timeout
+          // Initialize Firebase with a short timeout
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error("Firebase zamanaşımı")), 1500);
           });
@@ -70,8 +63,24 @@ function App() {
           setIsOfflineMode(true);
         }
         
-        // Clear timeout and proceed
-        clearTimeout(initTimeout);
+        // Now initialize Telegram in the background after Firebase
+        // This allows the app to load faster
+        setTimeout(() => {
+          const tgStatus = initializeTelegramApp();
+          setTelegramStatus(tgStatus);
+          
+          // Show the Telegram status briefly
+          if (tgStatus.success) {
+            setShowTelegramStatus(true);
+            setTimeout(() => setShowTelegramStatus(false), 3000);
+          } else {
+            // If there's an error, show it for longer
+            setShowTelegramStatus(true);
+            setTimeout(() => setShowTelegramStatus(false), 5000);
+          }
+        }, 100);
+        
+        // App is now initialized
         setIsInitialized(true);
         setInitError(null);
         
@@ -130,6 +139,22 @@ function App() {
       Çevrimdışı mod - Sınırlı özellikler kullanılabilir
     </div>
   ) : null;
+  
+  // Show Telegram status notification
+  const TelegramStatusNotification = () => {
+    if (!showTelegramStatus || !telegramStatus) return null;
+    
+    return (
+      <div className={`fixed bottom-20 left-0 right-0 mx-auto max-w-xs p-3 rounded-lg shadow-lg border text-center text-sm z-50 transition-opacity duration-300 ${
+        telegramStatus.success 
+          ? 'bg-green-900/80 border-green-500/30 text-green-100' 
+          : 'bg-yellow-900/80 border-yellow-500/30 text-yellow-100'
+      }`}>
+        <i className={`${telegramStatus.success ? 'ri-check-line' : 'ri-information-line'} mr-1`}></i>
+        <span>{telegramStatus.message}</span>
+      </div>
+    );
+  };
 
   // Proceed with the app even if there were initialization errors
   return (
@@ -137,6 +162,7 @@ function App() {
       <UserProvider>
         <OfflineBanner />
         <Router />
+        <TelegramStatusNotification />
         <Toaster />
       </UserProvider>
     </QueryClientProvider>
