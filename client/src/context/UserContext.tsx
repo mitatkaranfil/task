@@ -46,8 +46,18 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         const referralCode = urlParams.get("ref");
         
         console.log("UserContext - About to authenticate with Telegram");
-        // Authenticate with Telegram
-        const authenticatedUser = await authenticateTelegramUser(referralCode || undefined);
+        
+        // Set a timeout for authentication
+        const authPromise = authenticateTelegramUser(referralCode || undefined);
+        const timeoutPromise = new Promise<null>((resolve) => {
+          setTimeout(() => {
+            console.log("UserContext - Authentication timed out, using default user");
+            resolve(null);
+          }, 3000); // 3 second timeout
+        });
+        
+        // Race between authentication and timeout
+        const authenticatedUser = await Promise.race([authPromise, timeoutPromise]);
         
         console.log("UserContext - Authentication result:", authenticatedUser ? "Success" : "Failed");
         
@@ -68,27 +78,25 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         setUser(authenticatedUser);
         console.log("UserContext - User set:", authenticatedUser);
         
-        // Load active boosts
+        // Load active boosts - do this asynchronously without waiting
         if (authenticatedUser.id) {
           console.log("UserContext - Loading boosts for user:", authenticatedUser.id);
-          try {
-            const boosts = await getUserActiveBoosts(authenticatedUser.id);
-            console.log("UserContext - Loaded boosts:", boosts.length);
-            setActiveBoosts(boosts);
-          } catch (boostErr) {
-            console.error("UserContext - Error loading boosts:", boostErr);
-          }
+          getUserActiveBoosts(authenticatedUser.id)
+            .then(boosts => {
+              console.log("UserContext - Loaded boosts:", boosts.length);
+              setActiveBoosts(boosts);
+            })
+            .catch(boostErr => {
+              console.error("UserContext - Error loading boosts:", boostErr);
+            });
         }
         
-        // Check for mining rewards
+        // Check for mining rewards - also asynchronous
         if (authenticatedUser.lastMiningTime && isMiningAvailable(authenticatedUser.lastMiningTime as Date)) {
           console.log("UserContext - Claiming mining rewards");
-          try {
-            await claimMiningRewards(authenticatedUser);
-            console.log("UserContext - Mining rewards claimed");
-          } catch (miningErr) {
+          claimMiningRewards(authenticatedUser).catch(miningErr => {
             console.error("UserContext - Error claiming mining rewards:", miningErr);
-          }
+          });
         }
         
       } catch (err) {
@@ -101,7 +109,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     };
 
     initUser();
-  }, [initAttempts]); // Re-run when initAttempts changes
+  }, [initAttempts]);
 
   // Check for mining rewards
   const claimMiningRewards = async (userToUpdate = user): Promise<boolean> => {

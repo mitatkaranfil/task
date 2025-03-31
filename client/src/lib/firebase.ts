@@ -91,38 +91,54 @@ export async function initializeFirebase() {
     if (!app) {
       console.log("Creating Firebase app instance");
       
+      // Set a timeout for Firebase operations
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Firebase initialization timed out")), 5000);
+      });
+      
       try {
-        // Initialize Firebase with Analytics
-        app = initializeApp(firebaseConfig);
+        // Initialize Firebase but use Promise.race to add timeout
+        const initPromise = async () => {
+          // Initialize Firebase with Analytics
+          app = initializeApp(firebaseConfig);
+          
+          console.log("Getting Firestore database");
+          db = getFirestore(app);
+          console.log("Firebase and Firestore initialized successfully");
+          
+          // Analytics is only available in browser environment
+          if (typeof window !== 'undefined') {
+            try {
+              // Lazy import Firebase Analytics to avoid server-side issues
+              const { getAnalytics } = await import('firebase/analytics');
+              getAnalytics(app);
+              console.log("Firebase Analytics initialized");
+            } catch (analyticsError) {
+              console.warn("Analytics initialization skipped:", analyticsError);
+              // Continue despite analytics errors
+            }
+          }
+          
+          return { app, db };
+        };
         
-        console.log("Getting Firestore database");
-        db = getFirestore(app);
-        console.log("Firebase and Firestore initialized successfully");
+        // Race between initialization and timeout
+        await Promise.race([initPromise(), timeoutPromise]);
+        
+        // Initialize collections only if we have time - do this asynchronously
+        if (db) {
+          setTimeout(() => {
+            initializeDefaultData().catch(dataError => {
+              console.error("Error initializing default data:", dataError);
+              // Continue despite data initialization errors
+            });
+          }, 0);
+        }
       } catch (initError) {
         console.error("Error during Firebase initialization:", initError);
-        throw new Error("Firebase initialization failed");
-      }
-      
-      // Analytics is only available in browser environment
-      if (typeof window !== 'undefined') {
-        try {
-          // Lazy import Firebase Analytics to avoid server-side issues
-          const { getAnalytics } = await import('firebase/analytics');
-          getAnalytics(app);
-          console.log("Firebase Analytics initialized");
-        } catch (analyticsError) {
-          console.warn("Analytics initialization skipped:", analyticsError);
-        }
-      }
-      
-      // Initialize collections with default data if needed
-      try {
-        console.log("Initializing default data");
-        await initializeDefaultData();
-        console.log("Default data initialization completed");
-      } catch (dataError) {
-        console.error("Error initializing default data:", dataError);
-        // Continue despite data initialization errors
+        // If initialization failed, use fallback mode
+        console.log("Using fallback mode without Firebase");
+        return { app: null, db: null };
       }
     } else {
       console.log("Firebase already initialized");
@@ -130,7 +146,8 @@ export async function initializeFirebase() {
     return { app, db };
   } catch (error) {
     console.error("Error initializing Firebase:", error);
-    throw error;
+    // Return null values to indicate failure but allow app to continue
+    return { app: null, db: null };
   }
 }
 

@@ -35,34 +35,42 @@ function App() {
         initializeTelegramApp();
         
         try {
-          // Initialize Firebase with a timeout to prevent hanging
+          // Initialize Firebase with shorter timeout
           const firebasePromise = initializeFirebase();
           
-          // Create a timeout promise
+          // Create a shorter timeout promise - 5s instead of 10s
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error("Firebase initialization timed out")), 10000);
+            setTimeout(() => reject(new Error("Firebase initialization timed out")), 5000);
           });
           
           // Race between Firebase initialization and timeout
-          await Promise.race([firebasePromise, timeoutPromise]);
+          const result = await Promise.race([firebasePromise, timeoutPromise]);
           
-          console.log("App initialization complete");
+          if (result && typeof result === 'object' && 'app' in result) {
+            console.log("Firebase initialization complete");
+          } else {
+            console.log("Continuing without Firebase");
+          }
         } catch (firebaseError) {
           console.error("Firebase initialization error:", firebaseError);
           console.log("Continuing without Firebase");
           // Continue despite Firebase errors
         }
         
-        setIsInitialized(true);
-        setInitError(null);
+        // Always set initialized to true after a short timeout
+        // This ensures the app loads even if Firebase fails
+        setTimeout(() => {
+          setIsInitialized(true);
+          setInitError(null);
+        }, 500);
       } catch (error) {
         console.error("Failed to initialize app:", error);
         setInitError("Uygulama başlatılırken bir hata oluştu");
         
-        // Automatically retry up to 2 times
+        // Automatically retry up to 2 times but with shorter interval
         if (retryCount < 2) {
-          console.log(`Will retry initialization in 2 seconds (attempt ${retryCount + 1}/3)`);
-          setTimeout(() => setRetryCount(prev => prev + 1), 2000);
+          console.log(`Will retry initialization in 1 second (attempt ${retryCount + 1}/3)`);
+          setTimeout(() => setRetryCount(prev => prev + 1), 1000);
         } else {
           // After 3 failed attempts, just proceed with the app anyway
           console.log("Max retries exceeded, proceeding anyway");
