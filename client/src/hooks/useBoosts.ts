@@ -18,8 +18,26 @@ export const useBoosts = () => {
     const loadBoostTypes = async () => {
       try {
         setIsLoading(true);
-        const availableBoosts = await getBoostTypes();
-        setBoostTypes(availableBoosts);
+        
+        // Try to load boost types from API first
+        try {
+          console.log("Trying to load boost types from API");
+          const response = await fetch("/api/boosts");
+          
+          if (response.ok) {
+            const boostData = await response.json();
+            console.log("Boost types loaded from API:", boostData);
+            setBoostTypes(boostData);
+          } else {
+            console.warn("Failed to load boost types from API, falling back to Firebase");
+            const availableBoosts = await getBoostTypes();
+            setBoostTypes(availableBoosts);
+          }
+        } catch (apiError) {
+          console.warn("API error loading boost types, falling back to Firebase:", apiError);
+          const availableBoosts = await getBoostTypes();
+          setBoostTypes(availableBoosts);
+        }
       } catch (error) {
         console.error("Error loading boost types:", error);
         toast({
@@ -33,7 +51,7 @@ export const useBoosts = () => {
     };
     
     loadBoostTypes();
-  }, []);
+  }, [toast]);
   
   // Process boost purchase
   const buyBoost = async (boostTypeId: string) => {
@@ -64,6 +82,40 @@ export const useBoosts = () => {
       
       if (!confirmed) return;
       
+      // Try to purchase via the API first
+      try {
+        console.log("Trying to purchase boost via API", user.id, boostTypeId);
+        const response = await fetch(`/api/users/${user.id}/boosts`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ boostTypeId: parseInt(boostTypeId, 10) }),
+        });
+        
+        if (response.ok) {
+          const purchaseResult = await response.json();
+          console.log("Boost purchased via API:", purchaseResult);
+          
+          // Success
+          hapticFeedback("success");
+          toast({
+            title: "Boost Satın Alındı",
+            description: `${boostType.name} başarıyla aktifleştirildi!`,
+            variant: "default"
+          });
+          
+          // Refresh user data and boosts
+          await refreshUser();
+          return;
+        } else {
+          console.warn("Failed to purchase boost via API, falling back to Firebase");
+        }
+      } catch (apiError) {
+        console.warn("API error purchasing boost, falling back to Firebase:", apiError);
+      }
+      
+      // Fallback to Firebase
       // Purchase the boost
       const result = await purchaseBoost(user.id, boostTypeId);
       

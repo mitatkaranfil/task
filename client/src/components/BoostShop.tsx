@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect } from "react";
 import useBoosts from "@/hooks/useBoosts";
 import useUser from "@/hooks/useUser";
 import { formatPoints } from "@/lib/mining";
 import { BoostType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 const BoostShop: React.FC = () => {
   const { boostTypes, isLoading, buyBoost, getPotentialEarnings } = useBoosts();
@@ -18,6 +19,36 @@ const BoostShop: React.FC = () => {
     const iconName = boost.iconName || "rocket";
     const potentialEarnings = getPotentialEarnings(boost);
     
+    // Predefined color classes to avoid tailwind purging issues
+    const colorClassMap = {
+      blue: "bg-blue-500/20 text-blue-400 hover:bg-blue-600",
+      purple: "bg-purple-500/20 text-purple-400 hover:bg-purple-600",
+      yellow: "bg-yellow-500/20 text-yellow-400 hover:bg-yellow-600",
+      red: "bg-red-500/20 text-red-400 hover:bg-red-600",
+      green: "bg-green-500/20 text-green-400 hover:bg-green-600",
+      pink: "bg-pink-500/20 text-pink-400 hover:bg-pink-600",
+      orange: "bg-orange-500/20 text-orange-400 hover:bg-orange-600",
+      indigo: "bg-indigo-500/20 text-indigo-400 hover:bg-indigo-600",
+      teal: "bg-teal-500/20 text-teal-400 hover:bg-teal-600",
+      cyan: "bg-cyan-500/20 text-cyan-400 hover:bg-cyan-600",
+    };
+    
+    const buttonColorMap = {
+      blue: "bg-blue-500 hover:bg-blue-600", 
+      purple: "bg-purple-500 hover:bg-purple-600",
+      yellow: "bg-yellow-500 hover:bg-yellow-600",
+      red: "bg-red-500 hover:bg-red-600",
+      green: "bg-green-500 hover:bg-green-600",
+      pink: "bg-pink-500 hover:bg-pink-600",
+      orange: "bg-orange-500 hover:bg-orange-600",
+      indigo: "bg-indigo-500 hover:bg-indigo-600",
+      teal: "bg-teal-500 hover:bg-teal-600",
+      cyan: "bg-cyan-500 hover:bg-cyan-600",
+    };
+    
+    const iconColorClass = colorClassMap[colorClass as keyof typeof colorClassMap] || colorClassMap.blue;
+    const buttonColorClass = buttonColorMap[colorClass as keyof typeof buttonColorMap] || buttonColorMap.blue;
+    
     return (
       <div key={boost.id} className="bg-dark-card rounded-lg p-4 shadow relative">
         {boost.isPopular && (
@@ -27,8 +58,10 @@ const BoostShop: React.FC = () => {
         )}
         
         <div className="flex items-center mb-3">
-          <div className={`w-12 h-12 bg-${colorClass}-500/20 rounded-full flex items-center justify-center mr-3`}>
-            <i className={`ri-${iconName}-line text-${colorClass}-400 text-2xl`}></i>
+          <div className={cn("w-12 h-12 rounded-full flex items-center justify-center mr-3", 
+            iconColorClass.split(' ')[0]
+          )}>
+            <i className={cn("text-2xl", `ri-${iconName}-line`, iconColorClass.split(' ')[1])}></i>
           </div>
           <div>
             <h3 className="font-medium">{boost.name}</h3>
@@ -45,15 +78,15 @@ const BoostShop: React.FC = () => {
           {boost.isPopular ? (
             <Button 
               className="bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white px-4 py-2 rounded-lg text-sm transition"
-              onClick={() => buyBoost(boost.id)}
+              onClick={() => buyBoost(boost.id.toString())}
               disabled={user.points < boost.price}
             >
               Satın Al
             </Button>
           ) : (
             <Button 
-              className={`bg-${colorClass}-500 hover:bg-${colorClass}-600 text-white px-4 py-2 rounded-lg text-sm transition`}
-              onClick={() => buyBoost(boost.id)}
+              className={cn("text-white px-4 py-2 rounded-lg text-sm transition", buttonColorClass)}
+              onClick={() => buyBoost(boost.id.toString())}
               disabled={user.points < boost.price}
             >
               Satın Al
