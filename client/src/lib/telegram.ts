@@ -170,7 +170,10 @@ export function getTelegramUser(): {
 
 // Get or create a user in Firebase based on Telegram data
 export async function authenticateTelegramUser(referralCode?: string): Promise<User | null> {
+  console.log('Starting authenticateTelegramUser function');
   const telegramUser = getTelegramUser();
+  
+  console.log('getTelegramUser returned:', telegramUser);
   
   if (!telegramUser) {
     console.error('No Telegram user found');
@@ -178,15 +181,19 @@ export async function authenticateTelegramUser(referralCode?: string): Promise<U
   }
   
   try {
+    console.log('Looking up user in Firebase by Telegram ID:', telegramUser.telegramId);
     // Check if user exists in Firebase
     let user = await getUserByTelegramId(telegramUser.telegramId);
     
+    console.log('getUserByTelegramId returned:', user);
+    
     // If user doesn't exist, create a new one
     if (!user) {
+      console.log('User not found in Firebase, creating new user');
       // Generate a unique referral code
       const newReferralCode = nanoid(8);
       
-      user = await createUser({
+      const userData = {
         telegramId: telegramUser.telegramId,
         firstName: telegramUser.firstName,
         lastName: telegramUser.lastName,
@@ -194,7 +201,13 @@ export async function authenticateTelegramUser(referralCode?: string): Promise<U
         photoUrl: telegramUser.photoUrl,
         referralCode: newReferralCode,
         referredBy: referralCode
-      });
+      };
+      
+      console.log('Creating user with data:', userData);
+      user = await createUser(userData);
+      console.log('User created:', user);
+    } else {
+      console.log('Existing user found in Firebase');
     }
     
     return user;

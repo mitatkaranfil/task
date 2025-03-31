@@ -38,34 +38,54 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     const initUser = async () => {
       try {
         setIsLoading(true);
+        console.log("Initializing user");
+        
         // Get URL parameters for referral
         const urlParams = new URLSearchParams(window.location.search);
         const referralCode = urlParams.get("ref");
         
+        console.log("About to authenticate with Telegram");
         // Authenticate with Telegram
         const authenticatedUser = await authenticateTelegramUser(referralCode || undefined);
         
+        console.log("Authentication result:", authenticatedUser ? "Success" : "Failed");
+        
         if (!authenticatedUser) {
+          console.error("Authentication returned null user");
           throw new Error("Authentication failed");
         }
         
         setUser(authenticatedUser);
+        console.log("User set:", authenticatedUser);
         
         // Load active boosts
         if (authenticatedUser.id) {
-          const boosts = await getUserActiveBoosts(authenticatedUser.id);
-          setActiveBoosts(boosts);
+          console.log("Loading boosts for user:", authenticatedUser.id);
+          try {
+            const boosts = await getUserActiveBoosts(authenticatedUser.id);
+            console.log("Loaded boosts:", boosts.length);
+            setActiveBoosts(boosts);
+          } catch (boostErr) {
+            console.error("Error loading boosts:", boostErr);
+          }
         }
         
         // Check for mining rewards
         if (authenticatedUser.lastMiningTime && isMiningAvailable(authenticatedUser.lastMiningTime as Date)) {
-          await claimMiningRewards(authenticatedUser);
+          console.log("Claiming mining rewards");
+          try {
+            await claimMiningRewards(authenticatedUser);
+            console.log("Mining rewards claimed");
+          } catch (miningErr) {
+            console.error("Error claiming mining rewards:", miningErr);
+          }
         }
         
       } catch (err) {
         console.error("Error initializing user:", err);
         setError("Failed to initialize user");
       } finally {
+        console.log("User initialization completed");
         setIsLoading(false);
       }
     };
