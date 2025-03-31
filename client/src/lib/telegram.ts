@@ -239,88 +239,92 @@ export async function authenticateTelegramUser(referralCode?: string): Promise<U
   }
   
   try {
-    // Try to fetch user with API first (much more reliable than Firebase)
-    try {
-      console.log('Trying to fetch user via API endpoint');
-      const response = await fetch(`/api/users/${telegramUser.telegramId}`);
-      
-      if (response.ok) {
-        const userData = await response.json();
-        console.log('User found via API:', userData);
-        return userData;
-      } else {
-        console.log('User not found via API, will try creating');
-        
-        // Generate a unique referral code
-        const newReferralCode = nanoid(8);
-        
-        // Try to create user via API
-        const userData = {
-          telegramId: telegramUser.telegramId,
-          firstName: telegramUser.firstName,
-          lastName: telegramUser.lastName,
-          username: telegramUser.username,
-          photoUrl: telegramUser.photoUrl,
-          referralCode: newReferralCode,
-          // Ensure referredBy is never undefined
-          referredBy: referralCode || null
-        };
-        
-        console.log('Creating user with data via API:', userData);
-        
-        const createResponse = await fetch('/api/users', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(userData),
-        });
-        
-        if (createResponse.ok) {
-          const createdUser = await createResponse.json();
-          console.log('User created via API:', createdUser);
-          return createdUser;
-        } else {
-          console.warn('Failed to create user via API, will fall back to Firebase');
-        }
+    // Try to fetch user from Firebase first instead of API (API endpoint might be returning 404)
+    console.log('Fetching user from Firebase with ID:', telegramUser.telegramId);
+    const existingUser = await getUserByTelegramId(telegramUser.telegramId);
+    
+    if (existingUser) {
+      console.log('User found in Firebase:', existingUser);
+      // Cache the user in localStorage
+      try {
+        localStorage.setItem('cachedUser', JSON.stringify(existingUser));
+      } catch (e) {
+        console.warn('Could not cache user:', e);
       }
-    } catch (apiError) {
-      console.warn('API error, falling back to Firebase:', apiError);
+      return existingUser;
     }
     
-    // Fallback to Firebase if API fails
-    console.log('Looking up user in Firebase by Telegram ID:', telegramUser.telegramId);
-    let user = await getUserByTelegramId(telegramUser.telegramId);
+    // If user not found in Firebase, create a new user
+    console.log('User not found in Firebase, creating a new user');
+    const newUser: User = {
+      id: nanoid(),
+      telegramId: telegramUser.telegramId,
+      firstName: telegramUser.firstName,
+      lastName: telegramUser.lastName || '',
+      username: telegramUser.username || `user_${telegramUser.telegramId}`,
+      level: 1,
+      points: 0,
+      miningSpeed: 10, // Default mining speed
+      lastMiningTime: new Date(),
+      joinDate: new Date(),
+      completedTasksCount: 0,
+      boostUsageCount: 0,
+      referralCode: nanoid(6).toUpperCase(),
+      isOfflineMode: false
+    };
     
-    console.log('getUserByTelegramId returned:', user);
-    
-    // If user doesn't exist, create a new one
-    if (!user) {
-      console.log('User not found in Firebase, creating new user');
-      const newReferralCode = nanoid(8);
-      
-      const userData = {
-        telegramId: telegramUser.telegramId,
-        firstName: telegramUser.firstName,
-        lastName: telegramUser.lastName,
-        username: telegramUser.username,
-        photoUrl: telegramUser.photoUrl,
-        referralCode: newReferralCode,
-        // Ensure referredBy is never undefined
-        referredBy: referralCode || null
-      };
-      
-      console.log('Creating user with data:', userData);
-      user = await createUser(userData);
-      console.log('User created:', user);
-    } else {
-      console.log('Existing user found in Firebase');
+    // Save referral if provided
+    if (referralCode) {
+      console.log('Referral code provided:', referralCode);
+      // Will be processed by the backend
+      newUser.referredBy = referralCode;
     }
     
-    return user;
+    console.log('Creating user in Firebase:', newUser);
+    await createUser(newUser);
+    
+    // Cache the new user
+    try {
+      localStorage.setItem('cachedUser', JSON.stringify(newUser));
+    } catch (e) {
+      console.warn('Could not cache new user:', e);
+    }
+    
+    return newUser;
+    
   } catch (error) {
     console.error('Error authenticating Telegram user:', error);
-    return null;
+    
+    // Check if we have a cached user to use as fallback
+    try {
+      const cachedUserStr = localStorage.getItem('cachedUser');
+      if (cachedUserStr) {
+        const cachedUser = JSON.parse(cachedUserStr);
+        console.log('Using cached user as fallback:', cachedUser);
+        return cachedUser;
+      }
+    } catch (cacheError) {
+      console.error('Error reading from cache:', cacheError);
+    }
+    
+    // Last resort - return fallback user
+    console.log('Returning offline fallback user');
+    return {
+      id: 'offline-user-' + Date.now(),
+      telegramId: telegramUser.telegramId,
+      firstName: telegramUser.firstName,
+      lastName: telegramUser.lastName || '',
+      username: telegramUser.username || 'offline_user',
+      level: 1,
+      points: 100,
+      miningSpeed: 10,
+      lastMiningTime: new Date(),
+      joinDate: new Date(),
+      completedTasksCount: 0,
+      boostUsageCount: 0,
+      referralCode: 'OFFLINE',
+      isOfflineMode: true
+    };
   }
 }
 
