@@ -110,15 +110,20 @@ export function isTelegramWebApp(): boolean {
     console.log('isTelegramWebApp check - window.Telegram exists:', hasTelegramObject);
     console.log('isTelegramWebApp check - window.Telegram.WebApp exists:', hasWebAppObject);
     
-    // Development mode - always return true for testing
-    return true;
+    // Determine if we're in development or production
+    const isDevelopment = import.meta.env.DEV;
     
-    // For production environment (uncomment for production):
-    // return hasWebAppObject;
+    if (isDevelopment) {
+      // In development, we'll allow the app to work outside Telegram
+      return true;
+    }
+    
+    // In production, only return true if actually in Telegram WebApp
+    return hasWebAppObject;
   } catch (error) {
     console.warn('Error checking Telegram WebApp:', error);
-    // Return true for development
-    return true;
+    // Return true for development, false for production
+    return import.meta.env.DEV ? true : false;
   }
 }
 
@@ -182,20 +187,23 @@ export function getTelegramUser(): {
     console.log('initDataUnsafe exists:', !!window.Telegram?.WebApp?.initDataUnsafe);
     console.log('user exists:', !!window.Telegram?.WebApp?.initDataUnsafe?.user);
     
-    // For development/testing:
-    // Create mock user data when running outside Telegram
-    const testUser = {
-      telegramId: "123456789",
-      firstName: "Test",
-      lastName: "User",
-      username: "testuser",
-      photoUrl: "https://via.placeholder.com/100"
-    };
-    console.log('Using test user data for development');
-    return testUser;
+    // Determine if we're in development or production environment
+    const isDevelopment = import.meta.env.DEV;
     
-    // For production: uncomment below and remove testUser code above
-    /*
+    if (isDevelopment && (!window.Telegram?.WebApp?.initDataUnsafe?.user)) {
+      // Development environment - use test data
+      const testUser = {
+        telegramId: "123456789",
+        firstName: "Test",
+        lastName: "User",
+        username: "testuser",
+        photoUrl: "https://via.placeholder.com/100"
+      };
+      console.log('Using test user data for development');
+      return testUser;
+    }
+    
+    // Production or development with real Telegram WebApp
     if (!isTelegramWebApp() || !window.Telegram?.WebApp?.initDataUnsafe?.user) {
       console.log('Not in Telegram WebApp or user data unavailable');
       return null;
@@ -211,7 +219,6 @@ export function getTelegramUser(): {
       username: user.username,
       photoUrl: user.photo_url
     };
-    */
   } catch (error) {
     console.error('Error getting Telegram user:', error);
     return null;
