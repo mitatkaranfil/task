@@ -19,13 +19,13 @@ import { User, Task, BoostType, UserBoost, UserTask, Referral } from "@/types";
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDaMZtW4JGDzBYLULJ-9LARgHI0LkwXYvs",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "cosmofy-c0363.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "cosmofy-c0363",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "cosmofy-c0363.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "494837128301",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:494837128301:web:9ee2265aa44e1687913364",
-  measurementId: "G-TVFJE9FDHS"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-TVFJE9FDHS"
 };
 
 // Firebase app instance
@@ -257,54 +257,38 @@ export async function createUser(userData: Partial<User>): Promise<User | null> 
     
     console.log("createUser - Complete user data to save:", newUser);
     
+    // Try to use server API first (more reliable)
     try {
-      const docRef = await addDoc(usersRef, newUser);
-      console.log("createUser - User created with ID:", docRef.id);
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newUser),
+      });
       
-      return {
-        id: docRef.id,
-        ...newUser
-      } as User;
-    } catch (innerError) {
-      console.error("createUser - Inner error creating user document:", innerError);
-      // Simple fallback user for debugging
-      return {
-        id: "test-user-id",
-        telegramId: userData.telegramId || "123456789",
-        firstName: userData.firstName || "Test",
-        lastName: userData.lastName || "User",
-        username: userData.username || "testuser",
-        photoUrl: userData.photoUrl || "https://via.placeholder.com/100",
-        referralCode: userData.referralCode || "12345678",
-        level: 1,
-        points: 0,
-        miningSpeed: 10,
-        lastMiningTime: Timestamp.now(),
-        joinDate: Timestamp.now(),
-        completedTasksCount: 0,
-        boostUsageCount: 0
-      } as User;
+      if (response.ok) {
+        const createdUser = await response.json();
+        console.log("createUser - User created through API:", createdUser);
+        return createdUser as User;
+      } else {
+        console.warn("Failed to create user through API, falling back to Firebase");
+      }
+    } catch (apiError) {
+      console.warn("API error creating user, falling back to Firebase:", apiError);
     }
+    
+    // Firebase fallback
+    const docRef = await addDoc(usersRef, newUser);
+    console.log("createUser - User created with ID:", docRef.id);
+    
+    return {
+      id: docRef.id,
+      ...newUser
+    } as User;
   } catch (error) {
     console.error("Error creating user:", error);
-    
-    // Simple fallback user for debugging
-    return {
-      id: "test-user-id",
-      telegramId: userData.telegramId || "123456789",
-      firstName: userData.firstName || "Test",
-      lastName: userData.lastName || "User",
-      username: userData.username || "testuser",
-      photoUrl: userData.photoUrl || "https://via.placeholder.com/100",
-      referralCode: userData.referralCode || "12345678",
-      level: 1,
-      points: 0,
-      miningSpeed: 10,
-      lastMiningTime: Timestamp.now(),
-      joinDate: Timestamp.now(),
-      completedTasksCount: 0,
-      boostUsageCount: 0
-    } as User;
+    throw error;
   }
 }
 

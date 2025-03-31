@@ -110,16 +110,11 @@ export function isTelegramWebApp(): boolean {
     console.log('isTelegramWebApp check - window.Telegram exists:', hasTelegramObject);
     console.log('isTelegramWebApp check - window.Telegram.WebApp exists:', hasWebAppObject);
     
-    // Always return true for development and testing
-    // This allows the app to proceed as if it's in Telegram environment
-    return true;
-    
-    // For production, you would use:
-    // return hasWebAppObject;
+    // For production environment
+    return hasWebAppObject;
   } catch (error) {
     console.warn('Error checking Telegram WebApp:', error);
-    // Still return true for development
-    return true;
+    return false;
   }
 }
 
@@ -184,15 +179,8 @@ export function getTelegramUser(): {
     console.log('user exists:', !!window.Telegram?.WebApp?.initDataUnsafe?.user);
     
     if (!isTelegramWebApp() || !window.Telegram?.WebApp?.initDataUnsafe?.user) {
-      // For development/testing when not in Telegram, return mock user
-      console.log('Using development test user - No Telegram WebApp or user data available');
-      return {
-        telegramId: '123456789',
-        firstName: 'Test',
-        lastName: 'User',
-        username: 'testuser',
-        photoUrl: 'https://via.placeholder.com/100'
-      };
+      console.log('Not in Telegram WebApp or user data unavailable');
+      return null;
     }
 
     const user = window.Telegram.WebApp.initDataUnsafe.user;
@@ -206,15 +194,8 @@ export function getTelegramUser(): {
       photoUrl: user.photo_url
     };
   } catch (error) {
-    console.error('Error getting Telegram user, using development user:', error);
-    // Return development user on error
-    return {
-      telegramId: '123456789',
-      firstName: 'Test',
-      lastName: 'User',
-      username: 'testuser',
-      photoUrl: 'https://via.placeholder.com/100'
-    };
+    console.error('Error getting Telegram user:', error);
+    return null;
   }
 }
 
