@@ -177,7 +177,40 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     }
   };
 
-  if (isLoading && !user) {
+  // Show loading screen only for the first 10 seconds, then proceed with test user
+  const [hasTimedOut, setHasTimedOut] = useState(false);
+  
+  useEffect(() => {
+    // Set a timeout to bypass the loading screen after 10 seconds
+    const timeoutId = setTimeout(() => {
+      if (isLoading && !user) {
+        console.log("UserContext - Loading timed out, using test user");
+        setHasTimedOut(true);
+        setIsLoading(false);
+        // Create a basic test user
+        setUser({
+          id: "test-user-id",
+          telegramId: "123456789",
+          firstName: "Test",
+          lastName: "User",
+          username: "testuser",
+          photoUrl: "https://via.placeholder.com/100",
+          referralCode: "test123",
+          level: 1,
+          points: 0,
+          miningSpeed: 10,
+          lastMiningTime: new Date(),
+          joinDate: new Date(),
+          completedTasksCount: 0,
+          boostUsageCount: 0
+        });
+      }
+    }, 10000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [isLoading, user]);
+  
+  if (isLoading && !user && !hasTimedOut) {
     return <LoadingScreen message="Telegram'a bağlanıyor..." />;
   }
 

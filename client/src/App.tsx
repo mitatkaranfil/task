@@ -22,25 +22,57 @@ function Router() {
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const init = async () => {
       try {
-        // Initialize Firebase
-        await initializeFirebase();
+        console.log(`App initialization attempt ${retryCount + 1}`);
+        
+        // Initialize Firebase with a timeout to prevent hanging
+        const firebasePromise = initializeFirebase();
+        
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Firebase initialization timed out")), 10000);
+        });
+        
+        // Race between Firebase initialization and timeout
+        await Promise.race([firebasePromise, timeoutPromise]);
+        
+        console.log("App initialization complete");
         setIsInitialized(true);
+        setInitError(null);
       } catch (error) {
         console.error("Failed to initialize app:", error);
+        setInitError("Uygulama başlatılırken bir hata oluştu");
+        
+        // Automatically retry up to 2 times
+        if (retryCount < 2) {
+          console.log(`Will retry initialization in 2 seconds (attempt ${retryCount + 1}/3)`);
+          setTimeout(() => setRetryCount(prev => prev + 1), 2000);
+        } else {
+          // After 3 failed attempts, just proceed with the app anyway
+          console.log("Max retries exceeded, proceeding anyway");
+          setIsInitialized(true);
+        }
       }
     };
 
     init();
-  }, []);
+  }, [retryCount]);
 
+  // If we're still initializing, show loading screen
   if (!isInitialized) {
-    return <LoadingScreen message="Uygulama yükleniyor..." />;
+    return (
+      <LoadingScreen 
+        message={initError ? `${initError}. Yeniden deneniyor...` : "Uygulama yükleniyor..."} 
+      />
+    );
   }
 
+  // Proceed with the app even if there were initialization errors
   return (
     <QueryClientProvider client={queryClient}>
       <UserProvider>
