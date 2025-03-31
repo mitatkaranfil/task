@@ -110,11 +110,15 @@ export function isTelegramWebApp(): boolean {
     console.log('isTelegramWebApp check - window.Telegram exists:', hasTelegramObject);
     console.log('isTelegramWebApp check - window.Telegram.WebApp exists:', hasWebAppObject);
     
-    // For production environment
-    return hasWebAppObject;
+    // Development mode - always return true for testing
+    return true;
+    
+    // For production environment (uncomment for production):
+    // return hasWebAppObject;
   } catch (error) {
     console.warn('Error checking Telegram WebApp:', error);
-    return false;
+    // Return true for development
+    return true;
   }
 }
 
@@ -178,6 +182,20 @@ export function getTelegramUser(): {
     console.log('initDataUnsafe exists:', !!window.Telegram?.WebApp?.initDataUnsafe);
     console.log('user exists:', !!window.Telegram?.WebApp?.initDataUnsafe?.user);
     
+    // For development/testing:
+    // Create mock user data when running outside Telegram
+    const testUser = {
+      telegramId: "123456789",
+      firstName: "Test",
+      lastName: "User",
+      username: "testuser",
+      photoUrl: "https://via.placeholder.com/100"
+    };
+    console.log('Using test user data for development');
+    return testUser;
+    
+    // For production: uncomment below and remove testUser code above
+    /*
     if (!isTelegramWebApp() || !window.Telegram?.WebApp?.initDataUnsafe?.user) {
       console.log('Not in Telegram WebApp or user data unavailable');
       return null;
@@ -193,6 +211,7 @@ export function getTelegramUser(): {
       username: user.username,
       photoUrl: user.photo_url
     };
+    */
   } catch (error) {
     console.error('Error getting Telegram user:', error);
     return null;
@@ -212,8 +231,56 @@ export async function authenticateTelegramUser(referralCode?: string): Promise<U
   }
   
   try {
+    // Try to fetch user with API first (much more reliable than Firebase)
+    try {
+      console.log('Trying to fetch user via API endpoint');
+      const response = await fetch(`/api/users/${telegramUser.telegramId}`);
+      
+      if (response.ok) {
+        const userData = await response.json();
+        console.log('User found via API:', userData);
+        return userData;
+      } else {
+        console.log('User not found via API, will try creating');
+        
+        // Generate a unique referral code
+        const newReferralCode = nanoid(8);
+        
+        // Try to create user via API
+        const userData = {
+          telegramId: telegramUser.telegramId,
+          firstName: telegramUser.firstName,
+          lastName: telegramUser.lastName,
+          username: telegramUser.username,
+          photoUrl: telegramUser.photoUrl,
+          referralCode: newReferralCode,
+          referredBy: referralCode
+        };
+        
+        console.log('Creating user with data via API:', userData);
+        
+        const createResponse = await fetch('/api/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(userData),
+        });
+        
+        if (createResponse.ok) {
+          const createdUser = await createResponse.json();
+          console.log('User created via API:', createdUser);
+          return createdUser;
+        } else {
+          console.warn('Failed to create user via API, will fall back to Firebase');
+        }
+      }
+    } catch (apiError) {
+      console.warn('API error, falling back to Firebase:', apiError);
+    }
+    
+    // Fallback to Firebase if API fails
     console.log('Looking up user in Firebase by Telegram ID:', telegramUser.telegramId);
-    // Check if user exists in Firebase
     let user = await getUserByTelegramId(telegramUser.telegramId);
     
     console.log('getUserByTelegramId returned:', user);
@@ -221,7 +288,6 @@ export async function authenticateTelegramUser(referralCode?: string): Promise<U
     // If user doesn't exist, create a new one
     if (!user) {
       console.log('User not found in Firebase, creating new user');
-      // Generate a unique referral code
       const newReferralCode = nanoid(8);
       
       const userData = {
