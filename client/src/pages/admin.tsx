@@ -136,7 +136,38 @@ const Admin: React.FC = () => {
   // Task management
   const handleAddTask = async (data: z.infer<typeof taskFormSchema>) => {
     try {
-      await createTask(data);
+      console.log("Adding task with data:", JSON.stringify(data));
+      
+      // Try API first
+      try {
+        const response = await fetch('/api/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log("Task added via API:", result);
+          toast({
+            title: "Görev Eklendi",
+            description: "Yeni görev başarıyla eklendi.",
+          });
+          loadData();
+          return;
+        } else {
+          console.warn("Failed to add task via API, falling back to Firebase");
+        }
+      } catch (apiError) {
+        console.warn("API error adding task, falling back to Firebase:", apiError);
+      }
+      
+      // Firebase fallback
+      const result = await createTask(data);
+      console.log("Task added via Firebase:", result);
+      
       toast({
         title: "Görev Eklendi",
         description: "Yeni görev başarıyla eklendi.",
@@ -249,23 +280,49 @@ const Admin: React.FC = () => {
     onSubmit: (data: z.infer<typeof taskFormSchema>) => void;
     buttonText: string;
   }> = ({ task, onSubmit, buttonText }) => {
-    const form = useForm<z.infer<typeof taskFormSchema>>({
-      resolver: zodResolver(taskFormSchema),
-      defaultValues: task || {
+    // Create a clean default object without type errors
+    const getDefaultValues = () => {
+      if (task) {
+        // Convert task data to match the schema
+        return {
+          title: task.title,
+          description: task.description,
+          type: task.type as "daily" | "weekly" | "special",
+          points: task.points,
+          requiredAmount: task.requiredAmount,
+          isActive: task.isActive,
+          telegramAction: task.telegramAction || "",
+          telegramTarget: task.telegramTarget || "",
+        };
+      }
+      
+      return {
         title: "",
         description: "",
-        type: "daily",
+        type: "daily" as const,
         points: 10,
         requiredAmount: 1,
         isActive: true,
         telegramAction: "",
         telegramTarget: "",
-      },
+      };
+    };
+    
+    const form = useForm<z.infer<typeof taskFormSchema>>({
+      resolver: zodResolver(taskFormSchema),
+      defaultValues: getDefaultValues(),
     });
     
     const [isOpen, setIsOpen] = useState(false);
     
     const handleFormSubmit = (data: z.infer<typeof taskFormSchema>) => {
+      console.log("Task form submitted with data:", JSON.stringify(data));
+      
+      // Make sure telegramTarget is null if empty
+      if (data.telegramTarget === "") {
+        data.telegramTarget = null;
+      }
+      
       onSubmit(data);
       setIsOpen(false);
     };
