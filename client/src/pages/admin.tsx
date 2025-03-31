@@ -226,7 +226,43 @@ const Admin: React.FC = () => {
   
   const handleUpdateTask = async (id: string, data: z.infer<typeof taskFormSchema>) => {
     try {
+      console.log("Updating task with ID:", id, "and data:", JSON.stringify(data));
+      
+      // Make sure telegramTarget is null if empty
+      if (data.telegramTarget === "") {
+        data.telegramTarget = null;
+      }
+      
+      // Try API first
+      try {
+        const response = await fetch(`/api/tasks/${id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log("Task updated via API:", result);
+          toast({
+            title: "Görev Güncellendi",
+            description: "Görev başarıyla güncellendi.",
+          });
+          loadData();
+          return;
+        } else {
+          console.warn("Failed to update task via API, falling back to Firebase");
+        }
+      } catch (apiError) {
+        console.warn("API error updating task, falling back to Firebase:", apiError);
+      }
+      
+      // Firebase fallback
       await updateTask(id, data);
+      console.log("Task updated via Firebase");
+      
       toast({
         title: "Görev Güncellendi",
         description: "Görev başarıyla güncellendi.",
@@ -244,7 +280,33 @@ const Admin: React.FC = () => {
   
   const handleDeleteTask = async (id: string) => {
     try {
+      console.log("Deleting task with ID:", id);
+      
+      // Try API first
+      try {
+        const response = await fetch(`/api/tasks/${id}`, {
+          method: 'DELETE',
+        });
+        
+        if (response.ok) {
+          console.log("Task deleted via API");
+          toast({
+            title: "Görev Silindi",
+            description: "Görev başarıyla silindi.",
+          });
+          loadData();
+          return;
+        } else {
+          console.warn("Failed to delete task via API, falling back to Firebase");
+        }
+      } catch (apiError) {
+        console.warn("API error deleting task, falling back to Firebase:", apiError);
+      }
+      
+      // Firebase fallback
       await deleteTask(id);
+      console.log("Task deleted via Firebase");
+      
       toast({
         title: "Görev Silindi",
         description: "Görev başarıyla silindi.",
@@ -281,7 +343,38 @@ const Admin: React.FC = () => {
   
   const handleUpdateBoost = async (id: string, data: z.infer<typeof boostFormSchema>) => {
     try {
+      console.log("Updating boost with ID:", id, "and data:", JSON.stringify(data));
+      
+      // Try API first
+      try {
+        const response = await fetch(`/api/boosts/${id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log("Boost updated via API:", result);
+          toast({
+            title: "Boost Güncellendi",
+            description: "Boost başarıyla güncellendi.",
+          });
+          loadData();
+          return;
+        } else {
+          console.warn("Failed to update boost via API, falling back to Firebase");
+        }
+      } catch (apiError) {
+        console.warn("API error updating boost, falling back to Firebase:", apiError);
+      }
+      
+      // Firebase fallback
       await updateBoostType(id, data);
+      console.log("Boost updated via Firebase");
+      
       toast({
         title: "Boost Güncellendi",
         description: "Boost başarıyla güncellendi.",
@@ -299,7 +392,33 @@ const Admin: React.FC = () => {
   
   const handleDeleteBoost = async (id: string) => {
     try {
+      console.log("Deleting boost with ID:", id);
+      
+      // Try API first
+      try {
+        const response = await fetch(`/api/boosts/${id}`, {
+          method: 'DELETE',
+        });
+        
+        if (response.ok) {
+          console.log("Boost deleted via API");
+          toast({
+            title: "Boost Silindi",
+            description: "Boost başarıyla silindi.",
+          });
+          loadData();
+          return;
+        } else {
+          console.warn("Failed to delete boost via API, falling back to Firebase");
+        }
+      } catch (apiError) {
+        console.warn("API error deleting boost, falling back to Firebase:", apiError);
+      }
+      
+      // Firebase fallback
       await deleteBoostType(id);
+      console.log("Boost deleted via Firebase");
+      
       toast({
         title: "Boost Silindi",
         description: "Boost başarıyla silindi.",

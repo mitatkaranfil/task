@@ -198,6 +198,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Added PATCH endpoint for tasks to support the admin UI
+  router.patch("/tasks/:id", validateRequest(insertTaskSchema.partial()), async (req, res) => {
+    try {
+      console.log("PATCH task with ID:", req.params.id, "and data:", JSON.stringify(req.body));
+      const { id } = req.params;
+      const task = await storage.updateTask(parseInt(id, 10), req.body);
+      
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      
+      res.json(task);
+    } catch (error) {
+      console.error("Error updating task:", error);
+      res.status(500).json({ message: "Error updating task" });
+    }
+  });
+  
   router.delete("/tasks/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -313,6 +331,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   router.put("/boosts/:id", validateRequest(insertBoostTypeSchema.partial()), async (req, res) => {
     try {
+      const { id } = req.params;
+      const boostType = await storage.updateBoostType(parseInt(id, 10), req.body);
+      
+      if (!boostType) {
+        return res.status(404).json({ message: "Boost type not found" });
+      }
+      
+      res.json(boostType);
+    } catch (error) {
+      console.error("Error updating boost type:", error);
+      res.status(500).json({ message: "Error updating boost type" });
+    }
+  });
+  
+  // Added PATCH endpoint for boosts to support the admin UI
+  router.patch("/boosts/:id", validateRequest(insertBoostTypeSchema.partial()), async (req, res) => {
+    try {
+      console.log("PATCH boost with ID:", req.params.id, "and data:", JSON.stringify(req.body));
       const { id } = req.params;
       const boostType = await storage.updateBoostType(parseInt(id, 10), req.body);
       
