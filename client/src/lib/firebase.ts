@@ -1,20 +1,3 @@
-import { initializeApp } from "firebase/app";
-// Analytics will be imported dynamically to avoid SSR issues
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
-  updateDoc, 
-  query, 
-  where, 
-  Timestamp,
-  addDoc,
-  deleteDoc,
-  serverTimestamp 
-} from "firebase/firestore";
 import { User, Task, BoostType, UserBoost, UserTask, Referral } from "@/types";
 
 // Firebase configuration
@@ -80,6 +63,56 @@ const fallbackData = {
   ]
 };
 
+// Lazy load Firebase components
+const lazyLoadFirebase = async () => {
+  try {
+    const { initializeApp } = await import('firebase/app');
+    const { getFirestore } = await import('firebase/firestore');
+    return { initializeApp, getFirestore };
+  } catch (error) {
+    console.error("Error lazy loading Firebase:", error);
+    return null;
+  }
+};
+
+// Lazy load Firestore operations
+const lazyLoadFirestoreOperations = async () => {
+  try {
+    const { 
+      collection, 
+      doc, 
+      setDoc, 
+      getDoc, 
+      getDocs, 
+      updateDoc, 
+      query, 
+      where, 
+      Timestamp,
+      addDoc,
+      deleteDoc,
+      serverTimestamp 
+    } = await import('firebase/firestore');
+    
+    return {
+      collection, 
+      doc, 
+      setDoc, 
+      getDoc, 
+      getDocs, 
+      updateDoc, 
+      query, 
+      where, 
+      Timestamp,
+      addDoc,
+      deleteDoc,
+      serverTimestamp
+    };
+  } catch (error) {
+    console.error("Error lazy loading Firestore operations:", error);
+    return null;
+  }
+};
+
 // Initialize Firebase
 export async function initializeFirebase() {
   try {
@@ -98,9 +131,16 @@ export async function initializeFirebase() {
     
     try {
       const initPromise = async () => {
+        // Lazy load Firebase modules
+        const fbModules = await lazyLoadFirebase();
+        
+        if (!fbModules) {
+          throw new Error("Failed to load Firebase modules");
+        }
+        
         // Initialize Firebase with minimal configuration
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
+        app = fbModules.initializeApp(firebaseConfig);
+        db = fbModules.getFirestore(app);
         console.log("Firebase core services initialized");
         
         // Skip analytics in initial load to speed up initialization

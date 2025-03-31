@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { hapticFeedback } from "@/lib/telegram";
+import { motion } from "framer-motion";
 
 const TasksList: React.FC = () => {
   const { 
@@ -144,9 +145,12 @@ const TasksList: React.FC = () => {
     const typeStyle = taskTypeClasses[task.type] || taskTypeClasses.daily;
     
     return (
-      <div 
+      <motion.div 
         key={task.id} 
         className={`bg-dark-card rounded-lg p-4 shadow ${isCompleted ? 'opacity-75' : ''} transition-transform active:scale-98 transform`}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
       >
         <div className="flex justify-between items-start">
           <div>
@@ -193,7 +197,7 @@ const TasksList: React.FC = () => {
               'Görevi Tamamla'}
           </Button>
         )}
-      </div>
+      </motion.div>
     );
   };
   

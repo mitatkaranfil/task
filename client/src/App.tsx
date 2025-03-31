@@ -1,23 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { UserProvider } from "@/context/UserContext";
-import Home from "@/pages/home";
-import Admin from "@/pages/admin";
-import NotFound from "@/pages/not-found";
 import LoadingScreen from "@/components/LoadingScreen";
 import { initializeFirebase } from "./lib/firebase";
 import { initializeTelegramApp } from "./lib/telegram";
 
+// Lazy load pages to reduce initial bundle size
+const Home = lazy(() => import("@/pages/home"));
+const Admin = lazy(() => import("@/pages/admin"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/admin" component={Admin} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<LoadingScreen message="Sayfa yükleniyor..." />}>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/admin" component={Admin} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
