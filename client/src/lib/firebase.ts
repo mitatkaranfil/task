@@ -138,10 +138,19 @@ export async function initializeFirebase() {
           throw new Error("Failed to load Firebase modules");
         }
         
-        // Initialize Firebase with minimal configuration
-        app = fbModules.initializeApp(firebaseConfig);
-        db = fbModules.getFirestore(app);
-        console.log("Firebase core services initialized");
+        try {
+          // Initialize Firebase with minimal configuration
+          app = fbModules.initializeApp(firebaseConfig);
+          db = fbModules.getFirestore(app);
+          console.log("Firebase core services initialized");
+        } catch (initError: any) {
+          // Handle API key error gracefully
+          if (initError.message && initError.message.includes('API key')) {
+            console.warn("Firebase API key issue, switching to offline mode:", initError.message);
+            return { app: null, db: null, offline: true };
+          }
+          throw initError;
+        }
         
         // Skip analytics in initial load to speed up initialization
         return { app, db };
@@ -177,11 +186,11 @@ export async function initializeFirebase() {
     } catch (error) {
       console.error("Firebase initialization failed:", error);
       console.log("Using fallback mode");
-      return { app: null, db: null };
+      return { app: null, db: null, offline: true };
     }
   } catch (error) {
     console.error("Critical error during Firebase setup:", error);
-    return { app: null, db: null };
+    return { app: null, db: null, offline: true };
   }
 }
 

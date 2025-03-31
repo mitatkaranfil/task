@@ -142,11 +142,17 @@ export function initializeTelegramApp(): {success: boolean, message: string} {
         return {success: false, message: "Telegram WebApp API'sine erişilemedi"};
       }
       
-      // Set dark theme colors for app
+      // Set theme colors only if supported by current WebApp version
       try {
-        window.Telegram.WebApp.setHeaderColor('#121212');
-        window.Telegram.WebApp.setBackgroundColor('#121212');
-        console.log('Theme colors set');
+        // Check WebApp version before calling unsupported methods
+        const supportsColors = window.Telegram.WebApp.isVersionAtLeast('6.1');
+        if (supportsColors) {
+          window.Telegram.WebApp.setHeaderColor('#121212');
+          window.Telegram.WebApp.setBackgroundColor('#121212');
+          console.log('Theme colors set');
+        } else {
+          console.log('Color setting not supported in this WebApp version, skipping');
+        }
       } catch (colorError) {
         console.warn('Error setting theme colors:', colorError);
         // Not critical, continue
@@ -159,6 +165,17 @@ export function initializeTelegramApp(): {success: boolean, message: string} {
       } catch (expandError) {
         console.warn('Error calling WebApp.expand():', expandError);
         // Not critical, continue
+      }
+      
+      // Add a single call to ready() after all setup is done
+      try {
+        // Small delay to ensure previous commands are processed
+        setTimeout(() => {
+          window.Telegram.WebApp.ready();
+          console.log('Final WebApp.ready() call to ensure initialization');
+        }, 50);
+      } catch (finalReadyError) {
+        console.warn('Error in final ready call:', finalReadyError);
       }
       
       return {success: true, message: "Telegram WebApp bağlantısı başarılı"};

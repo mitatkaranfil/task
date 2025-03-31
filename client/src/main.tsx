@@ -1,4 +1,5 @@
-import { createRoot } from "react-dom/client";
+import React from "react";
+import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { initializeTelegramApp } from "./lib/telegram";
@@ -12,26 +13,24 @@ try {
   console.error("Main.tsx - Error initializing Telegram app:", error);
 }
 
-// Add event listener for DOM content loaded
-document.addEventListener('DOMContentLoaded', () => {
-  console.log("Main.tsx - DOM content loaded, rendering App");
-  const rootElement = document.getElementById("root");
-  if (rootElement) {
-    createRoot(rootElement).render(<App />);
-    console.log("Main.tsx - App rendered");
-  } else {
-    console.error("Main.tsx - Root element not found");
-  }
-});
+// Ensure we're not calling createRoot multiple times on the same container
+let root: ReactDOM.Root | null = null;
+const rootElement = document.getElementById("root");
 
-// Yedek render işlemi (eğer DOMContentLoaded tetiklenmezse)
-setTimeout(() => {
-  console.log("Main.tsx - Timeout render check");
-  if (!document.getElementById("root")?.hasChildNodes()) {
-    console.log("Main.tsx - Rendering App after timeout");
-    const rootElement = document.getElementById("root");
-    if (rootElement) {
-      createRoot(rootElement).render(<App />);
-    }
+if (rootElement) {
+  // Check if we already have a root associated with this container
+  if (!(rootElement as any).__reactContainer$) {
+    root = ReactDOM.createRoot(rootElement);
   }
-}, 1000);
+
+  // Only render if we successfully created a new root
+  if (root) {
+    root.render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+  } else {
+    console.warn("App already rendered, skipping duplicate render");
+  }
+}
