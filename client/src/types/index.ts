@@ -18,6 +18,7 @@ export interface User {
   completedTasksCount: number;
   boostUsageCount: number;
   referralCount?: number; // Used in UI, not stored directly
+  isOfflineMode?: boolean; // Flag for offline mode users
 }
 
 // Task Type

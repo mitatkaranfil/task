@@ -5,6 +5,24 @@ import { getUserActiveBoosts, updateUserLastMiningTime, updateUserPoints } from 
 import { calculateMiningSpeed, isMiningAvailable } from "@/lib/mining";
 import LoadingScreen from "@/components/LoadingScreen";
 
+// Create a fallback user for use when authentication fails
+const FALLBACK_USER: User = {
+  id: 'offline-user',
+  telegramId: '0',
+  firstName: 'Misafir',
+  lastName: 'Kullanıcı',
+  username: 'guest',
+  level: 1,
+  points: 100,
+  miningSpeed: 10,
+  lastMiningTime: new Date(),
+  joinDate: new Date(),
+  completedTasksCount: 0,
+  boostUsageCount: 0,
+  referralCode: 'OFFLINE',
+  isOfflineMode: true
+};
+
 interface UserContextType {
   user: User | null;
   isLoading: boolean;
@@ -12,6 +30,7 @@ interface UserContextType {
   activeBoosts: UserBoost[];
   refreshUser: () => Promise<void>;
   claimMiningRewards: () => Promise<boolean>;
+  isOfflineMode: boolean;
 }
 
 export const UserContext = createContext<UserContextType>({
@@ -21,6 +40,7 @@ export const UserContext = createContext<UserContextType>({
   activeBoosts: [],
   refreshUser: async () => {},
   claimMiningRewards: async () => false,
+  isOfflineMode: false
 });
 
 interface UserProviderProps {
@@ -33,82 +53,151 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   const [error, setError] = useState<string | null>(null);
   const [activeBoosts, setActiveBoosts] = useState<UserBoost[]>([]);
   const [initAttempts, setInitAttempts] = useState(0);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
 
   // Initialize user from Telegram
   useEffect(() => {
+    // Check if we're offline first
+    const checkConnection = () => {
+      const isOnline = navigator.onLine;
+      setIsOfflineMode(!isOnline);
+      return isOnline;
+    };
+
     const initUser = async () => {
       try {
         setIsLoading(true);
-        console.log("UserContext - Initializing user, attempt:", initAttempts + 1);
+        console.log("Kullanıcı bilgileri yükleniyor, deneme:", initAttempts + 1);
+        
+        // Check if we're offline
+        if (!checkConnection()) {
+          console.log("Çevrimdışı mod - misafir hesabı kullanılıyor");
+          setUser(FALLBACK_USER);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Try to load user from localStorage first
+        const cachedUser = localStorage.getItem('cachedUser');
+        if (cachedUser) {
+          try {
+            const parsedUser = JSON.parse(cachedUser);
+            console.log("Önbellek'ten kullanıcı yüklendi");
+            setUser(parsedUser);
+            // Continue with authentication in background
+          } catch (cacheError) {
+            console.error("Önbellek hatası:", cacheError);
+            // Continue with normal auth
+          }
+        }
         
         // Get URL parameters for referral
         const urlParams = new URLSearchParams(window.location.search);
         const referralCode = urlParams.get("ref");
         
-        console.log("UserContext - About to authenticate with Telegram");
+        console.log("Telegram ile kimlik doğrulaması başlatılıyor");
         
-        // Set a timeout for authentication
+        // Set a timeout for authentication - even shorter (2 seconds)
         const authPromise = authenticateTelegramUser(referralCode || undefined);
         const timeoutPromise = new Promise<null>((resolve) => {
           setTimeout(() => {
-            console.log("UserContext - Authentication timed out, using default user");
+            console.log("Kimlik doğrulama zaman aşımı - varsayılan kullanıcı kullanılıyor");
             resolve(null);
-          }, 3000); // 3 second timeout
+          }, 2000); // 2 second timeout
         });
         
         // Race between authentication and timeout
         const authenticatedUser = await Promise.race([authPromise, timeoutPromise]);
         
-        console.log("UserContext - Authentication result:", authenticatedUser ? "Success" : "Failed");
-        
         if (!authenticatedUser) {
-          console.error("UserContext - Authentication returned null user");
+          console.warn("Kimlik doğrulama başarısız oldu");
           
-          // If we failed to authenticate but have made less than 3 attempts,
-          // we'll try again in a moment (to give Telegram WebApp time to initialize)
-          if (initAttempts < 3) {
-            console.log(`UserContext - Retrying authentication (attempt ${initAttempts + 1}/3)`);
+          // If we already set a cached user, continue with that
+          if (user) {
+            console.log("Önbellekteki kullanıcı bilgileriyle devam ediliyor");
+            setIsLoading(false);
+            return;
+          }
+          
+          // If we failed but have made less than 2 attempts, try again
+          if (initAttempts < 1) {
+            console.log(`Kimlik doğrulama yeniden deneniyor (${initAttempts + 1}/2)`);
             setInitAttempts(prev => prev + 1);
             return; // Exit without setting isLoading to false
           }
           
-          throw new Error("Authentication failed after multiple attempts");
+          // After 2 failed attempts, use fallback user
+          console.log("Kimlik doğrulama başarısız - misafir hesabı kullanılıyor");
+          setUser(FALLBACK_USER);
+          setIsOfflineMode(true);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Cache the user for faster loading next time
+        try {
+          localStorage.setItem('cachedUser', JSON.stringify(authenticatedUser));
+        } catch (e) {
+          console.warn("Kullanıcı önbelleğe alınamadı:", e);
         }
         
         setUser(authenticatedUser);
-        console.log("UserContext - User set:", authenticatedUser);
+        console.log("Kullanıcı bilgileri yüklendi:", authenticatedUser.firstName);
         
-        // Load active boosts - do this asynchronously without waiting
+        // Load active boosts in background
         if (authenticatedUser.id) {
-          console.log("UserContext - Loading boosts for user:", authenticatedUser.id);
           getUserActiveBoosts(authenticatedUser.id)
             .then(boosts => {
-              console.log("UserContext - Loaded boosts:", boosts.length);
               setActiveBoosts(boosts);
             })
-            .catch(boostErr => {
-              console.error("UserContext - Error loading boosts:", boostErr);
+            .catch(err => {
+              console.error("Boost yüklenirken hata:", err);
             });
-        }
-        
-        // Check for mining rewards - also asynchronous
-        if (authenticatedUser.lastMiningTime && isMiningAvailable(authenticatedUser.lastMiningTime as Date)) {
-          console.log("UserContext - Claiming mining rewards");
-          claimMiningRewards(authenticatedUser).catch(miningErr => {
-            console.error("UserContext - Error claiming mining rewards:", miningErr);
-          });
+            
+          // Check for mining rewards in background too
+          if (authenticatedUser.lastMiningTime && isMiningAvailable(authenticatedUser.lastMiningTime as any as Date)) {
+            claimMiningRewards(authenticatedUser).catch(err => {
+              console.error("Kazım ödülü alınırken hata:", err);
+            });
+          }
         }
         
       } catch (err) {
-        console.error("UserContext - Error initializing user:", err);
-        setError("Failed to initialize user");
+        console.error("Kullanıcı bilgileri yüklenirken hata:", err);
+        setError("Kullanıcı bilgileri yüklenemedi");
+        
+        // Use fallback user in case of error
+        setUser(FALLBACK_USER);
+        setIsOfflineMode(true);
       } finally {
-        console.log("UserContext - User initialization completed or failed after max attempts");
         setIsLoading(false);
       }
     };
 
+    // Listen for online/offline events
+    const handleOnline = () => {
+      console.log("Çevrimiçi moduna geçildi");
+      setIsOfflineMode(false);
+      // Try to refresh user when we come back online
+      if (user?.isOfflineMode) {
+        initUser();
+      }
+    };
+    
+    const handleOffline = () => {
+      console.log("Çevrimdışı moduna geçildi");
+      setIsOfflineMode(true);
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     initUser();
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, [initAttempts]);
 
   // Check for mining rewards
@@ -116,7 +205,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     if (!userToUpdate) return false;
     
     try {
-      const lastMining = new Date(userToUpdate.lastMiningTime as Date);
+      const lastMining = new Date(userToUpdate.lastMiningTime as any);
       const now = new Date();
       
       // Calculate hours passed
@@ -125,6 +214,12 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       );
       
       if (hoursDiff <= 0) return false;
+      
+      // If in offline mode, don't attempt to update server
+      if (isOfflineMode || userToUpdate.isOfflineMode) {
+        console.log("Çevrimdışı mod - kazım ödülleri geçici olarak saklanıyor");
+        return false;
+      }
       
       // Calculate mining speed with boosts
       let miningSpeed = userToUpdate.miningSpeed;
@@ -150,7 +245,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       
       return true;
     } catch (err) {
-      console.error("Error claiming mining rewards:", err);
+      console.error("Kazım ödülü alınırken hata:", err);
       return false;
     }
   };
@@ -159,27 +254,49 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   const refreshUser = async (): Promise<void> => {
     if (!user) return;
     
+    // If in offline mode, don't attempt to refresh
+    if (isOfflineMode || user.isOfflineMode) {
+      console.log("Çevrimdışı mod - kullanıcı bilgileri yenilenemiyor");
+      return;
+    }
+    
     try {
       setIsLoading(true);
       
-      // Re-authenticate to get fresh user data
-      const refreshedUser = await authenticateTelegramUser();
+      // Set a short timeout for the refresh
+      const refreshPromise = authenticateTelegramUser();
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => {
+          console.log("Yenileme zaman aşımı");
+          resolve(null);
+        }, 2000);
+      });
+      
+      const refreshedUser = await Promise.race([refreshPromise, timeoutPromise]);
       
       if (!refreshedUser) {
-        throw new Error("Failed to refresh user");
+        throw new Error("Kullanıcı bilgileri yenilenemedi");
+      }
+      
+      // Update localStorage cache
+      try {
+        localStorage.setItem('cachedUser', JSON.stringify(refreshedUser));
+      } catch (e) {
+        console.warn("Kullanıcı önbelleğe alınamadı:", e);
       }
       
       setUser(refreshedUser);
       
       // Refresh active boosts
       if (refreshedUser.id) {
-        const boosts = await getUserActiveBoosts(refreshedUser.id);
-        setActiveBoosts(boosts);
+        getUserActiveBoosts(refreshedUser.id)
+          .then(boosts => setActiveBoosts(boosts))
+          .catch(err => console.error("Boost bilgileri yüklenemedi:", err));
       }
       
     } catch (err) {
-      console.error("Error refreshing user:", err);
-      setError("Failed to refresh user data");
+      console.error("Kullanıcı bilgileri yenilenirken hata:", err);
+      setError("Kullanıcı bilgileri yenilenemedi");
     } finally {
       setIsLoading(false);
     }
@@ -198,6 +315,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         activeBoosts,
         refreshUser,
         claimMiningRewards,
+        isOfflineMode
       }}
     >
       {children}

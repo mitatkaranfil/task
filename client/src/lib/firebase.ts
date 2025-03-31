@@ -83,70 +83,64 @@ const fallbackData = {
 // Initialize Firebase
 export async function initializeFirebase() {
   try {
-    console.log("Initializing Firebase with config:", JSON.stringify({
-      ...firebaseConfig,
-      apiKey: "***" // Masking API key for logs
-    }));
+    // Check if we have cached Firebase instance
+    if (app && db) {
+      console.log("Using cached Firebase instance");
+      return { app, db };
+    }
+
+    console.log("Initializing Firebase");
     
-    if (!app) {
-      console.log("Creating Firebase app instance");
+    // More aggressive timeout - 3 seconds instead of 5
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Firebase initialization timed out after 3s")), 3000);
+    });
+    
+    try {
+      const initPromise = async () => {
+        // Initialize Firebase with minimal configuration
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        console.log("Firebase core services initialized");
+        
+        // Skip analytics in initial load to speed up initialization
+        return { app, db };
+      };
       
-      // Set a timeout for Firebase operations
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Firebase initialization timed out")), 5000);
-      });
+      // Race between initialization and timeout
+      const result = await Promise.race([initPromise(), timeoutPromise]);
       
-      try {
-        // Initialize Firebase but use Promise.race to add timeout
-        const initPromise = async () => {
-          // Initialize Firebase with Analytics
-          app = initializeApp(firebaseConfig);
-          
-          console.log("Getting Firestore database");
-          db = getFirestore(app);
-          console.log("Firebase and Firestore initialized successfully");
-          
-          // Analytics is only available in browser environment
+      // If initialization succeeded, initialize collections in background
+      if (result && db) {
+        // Initialize additional services in background
+        setTimeout(() => {
+          // Initialize analytics only if we have time
           if (typeof window !== 'undefined') {
-            try {
-              // Lazy import Firebase Analytics to avoid server-side issues
-              const { getAnalytics } = await import('firebase/analytics');
-              getAnalytics(app);
-              console.log("Firebase Analytics initialized");
-            } catch (analyticsError) {
-              console.warn("Analytics initialization skipped:", analyticsError);
-              // Continue despite analytics errors
-            }
+            import('firebase/analytics').then(({ getAnalytics }) => {
+              try {
+                getAnalytics(app);
+                console.log("Firebase Analytics initialized in background");
+              } catch (e) {
+                console.warn("Failed to initialize analytics, continuing without it");
+              }
+            }).catch(() => {});
           }
           
-          return { app, db };
-        };
-        
-        // Race between initialization and timeout
-        await Promise.race([initPromise(), timeoutPromise]);
-        
-        // Initialize collections only if we have time - do this asynchronously
-        if (db) {
-          setTimeout(() => {
-            initializeDefaultData().catch(dataError => {
-              console.error("Error initializing default data:", dataError);
-              // Continue despite data initialization errors
-            });
-          }, 0);
-        }
-      } catch (initError) {
-        console.error("Error during Firebase initialization:", initError);
-        // If initialization failed, use fallback mode
-        console.log("Using fallback mode without Firebase");
-        return { app: null, db: null };
+          // Initialize default data in background
+          initializeDefaultData().catch(err => {
+            console.warn("Default data initialization failed, using fallback data");
+          });
+        }, 100);
       }
-    } else {
-      console.log("Firebase already initialized");
+      
+      return result;
+    } catch (error) {
+      console.error("Firebase initialization failed:", error);
+      console.log("Using fallback mode");
+      return { app: null, db: null };
     }
-    return { app, db };
   } catch (error) {
-    console.error("Error initializing Firebase:", error);
-    // Return null values to indicate failure but allow app to continue
+    console.error("Critical error during Firebase setup:", error);
     return { app: null, db: null };
   }
 }
@@ -154,126 +148,141 @@ export async function initializeFirebase() {
 // Initialize default data (tasks, boost types)
 async function initializeDefaultData() {
   if (!db) {
-    console.error("Firestore not initialized");
+    console.error("Firestore not initialized, using fallback data");
     return;
   }
   
   try {
-    // Check if boost types exist, if not create defaults
-    const boostTypesSnapshot = await getDocs(collection(db, "boostTypes"));
-    
-    if (boostTypesSnapshot.empty) {
-      // Default boost types
-      const defaultBoostTypes: Partial<BoostType>[] = [
-        {
-          name: "Hız Boost",
-          description: "Kazım hızını 24 saat boyunca 1.5x artır",
-          multiplier: 150, // 1.5x
-          durationHours: 24,
-          price: 500,
-          isActive: true,
-          iconName: "rocket",
-          colorClass: "blue",
-          isPopular: false
-        },
-        {
-          name: "Süper Boost",
-          description: "Kazım hızını 24 saat boyunca 2x artır",
-          multiplier: 200, // 2x
-          durationHours: 24,
-          price: 1000,
-          isActive: true,
-          iconName: "rocket",
-          colorClass: "purple",
-          isPopular: false
-        },
-        {
-          name: "Mega Boost",
-          description: "Kazım hızını 24 saat boyunca 3x artır",
-          multiplier: 300, // 3x
-          durationHours: 24,
-          price: 2000,
-          isActive: true,
-          iconName: "rocket",
-          colorClass: "yellow",
-          isPopular: false
-        },
-        {
-          name: "Ultra Boost",
-          description: "Kazım hızını 7 gün boyunca 2x artır",
-          multiplier: 200, // 2x
-          durationHours: 168, // 7 days
-          price: 5000,
-          isActive: true,
-          iconName: "rocket",
-          colorClass: "red",
-          isPopular: true
-        }
-      ];
+    // Use a timeout for this operation as well
+    const dataInitPromise = async () => {
+      // First check if we have cached data in localStorage
+      const cachedBoostTypes = localStorage.getItem('cachedBoostTypes');
+      const cachedTasks = localStorage.getItem('cachedTasks');
       
-      for (const boostType of defaultBoostTypes) {
-        await addDoc(collection(db, "boostTypes"), {
-          ...boostType,
-          createdAt: serverTimestamp()
-        });
+      // If we have cached data, we can skip Firestore queries
+      if (cachedBoostTypes && cachedTasks) {
+        console.log("Using cached data from localStorage");
+        return;
       }
-    }
-    
-    // Check if tasks exist, if not create defaults
-    const tasksSnapshot = await getDocs(collection(db, "tasks"));
-    
-    if (tasksSnapshot.empty) {
-      // Default tasks
-      const defaultTasks: Partial<Task>[] = [
-        {
-          title: "Uygulamayı Aç",
-          description: "Uygulamayı günde bir kez aç",
-          type: "daily",
-          points: 10,
-          requiredAmount: 1,
-          isActive: true,
-          telegramAction: "open_app",
-          telegramTarget: null
-        },
-        {
-          title: "Gruba Mesaj Gönder",
-          description: "Telegram grubuna en az 3 mesaj gönder",
-          type: "daily",
-          points: 50,
-          requiredAmount: 3,
-          isActive: true,
-          telegramAction: "send_message",
-          telegramTarget: "@mining_group"
-        },
-        {
-          title: "5 Arkadaş Davet Et",
-          description: "5 arkadaşını referans koduyla davet et",
-          type: "weekly",
-          points: 200,
-          requiredAmount: 5,
-          isActive: true,
-          telegramAction: "invite_friends",
-          telegramTarget: null
-        },
-        {
-          title: "Kanala Katıl",
-          description: "Resmi duyuru kanalımıza katıl",
-          type: "special",
-          points: 100,
-          requiredAmount: 1,
-          isActive: true,
-          telegramAction: "join_channel",
-          telegramTarget: "@mining_channel"
-        }
-      ];
       
-      for (const task of defaultTasks) {
-        await addDoc(collection(db, "tasks"), {
-          ...task,
-          createdAt: serverTimestamp()
-        });
+      // Check if boost types exist, if not create defaults
+      const boostTypesSnapshot = await getDocs(collection(db, "boostTypes"));
+      
+      if (boostTypesSnapshot.empty) {
+        // Default boost types
+        const defaultBoostTypes: Partial<BoostType>[] = [
+          {
+            name: "Hız Boost",
+            description: "Kazım hızını 24 saat boyunca 1.5x artır",
+            multiplier: 150, // 1.5x
+            durationHours: 24,
+            price: 500,
+            isActive: true,
+            iconName: "rocket",
+            colorClass: "blue",
+            isPopular: false
+          },
+          {
+            name: "Süper Boost",
+            description: "Kazım hızını 24 saat boyunca 2x artır",
+            multiplier: 200, // 2x
+            durationHours: 24,
+            price: 1000,
+            isActive: true,
+            iconName: "rocket",
+            colorClass: "purple",
+            isPopular: false
+          },
+          {
+            name: "Mega Boost",
+            description: "Kazım hızını 24 saat boyunca 3x artır",
+            multiplier: 300, // 3x
+            durationHours: 24,
+            price: 2000,
+            isActive: true,
+            iconName: "rocket",
+            colorClass: "yellow",
+            isPopular: false
+          },
+          {
+            name: "Ultra Boost",
+            description: "Kazım hızını 7 gün boyunca 2x artır",
+            multiplier: 200, // 2x
+            durationHours: 168, // 7 days
+            price: 5000,
+            isActive: true,
+            iconName: "rocket",
+            colorClass: "red",
+            isPopular: true
+          }
+        ];
+        
+        for (const boostType of defaultBoostTypes) {
+          await addDoc(collection(db, "boostTypes"), {
+            ...boostType,
+            createdAt: serverTimestamp()
+          });
+        }
       }
-    }
+      
+      // Check if tasks exist, if not create defaults
+      const tasksSnapshot = await getDocs(collection(db, "tasks"));
+      
+      if (tasksSnapshot.empty) {
+        // Default tasks
+        const defaultTasks: Partial<Task>[] = [
+          {
+            title: "Uygulamayı Aç",
+            description: "Uygulamayı günde bir kez aç",
+            type: "daily",
+            points: 10,
+            requiredAmount: 1,
+            isActive: true,
+            telegramAction: "open_app",
+            telegramTarget: null
+          },
+          {
+            title: "Gruba Mesaj Gönder",
+            description: "Telegram grubuna en az 3 mesaj gönder",
+            type: "daily",
+            points: 50,
+            requiredAmount: 3,
+            isActive: true,
+            telegramAction: "send_message",
+            telegramTarget: "@mining_group"
+          },
+          {
+            title: "5 Arkadaş Davet Et",
+            description: "5 arkadaşını referans koduyla davet et",
+            type: "weekly",
+            points: 200,
+            requiredAmount: 5,
+            isActive: true,
+            telegramAction: "invite_friends",
+            telegramTarget: null
+          },
+          {
+            title: "Kanala Katıl",
+            description: "Resmi duyuru kanalımıza katıl",
+            type: "special",
+            points: 100,
+            requiredAmount: 1,
+            isActive: true,
+            telegramAction: "join_channel",
+            telegramTarget: "@mining_channel"
+          }
+        ];
+        
+        for (const task of defaultTasks) {
+          await addDoc(collection(db, "tasks"), {
+            ...task,
+            createdAt: serverTimestamp()
+          });
+        }
+      }
+    };
+    
+    await dataInitPromise();
   } catch (error) {
     console.error("Error in initializeDefaultData:", error);
     throw error;
