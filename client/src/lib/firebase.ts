@@ -124,9 +124,17 @@ export async function initializeFirebase() {
 
     console.log("Initializing Firebase");
     
-    // More aggressive timeout - 3 seconds instead of 5
+    // Check for valid API key
+    if (!firebaseConfig.apiKey || 
+        firebaseConfig.apiKey === "AIzaSyDkfIJNpO_6dWSLm6jrfxr7-Pg1ysNMGiE" || 
+        firebaseConfig.apiKey.includes("VITE_FIREBASE")) {
+      console.warn("Invalid or default Firebase API key, switching to offline mode");
+      return { app: null, db: null, offline: true };
+    }
+    
+    // More aggressive timeout - 2 seconds instead of 3
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Firebase initialization timed out after 3s")), 3000);
+      setTimeout(() => reject(new Error("Firebase initialization timed out after 2s")), 2000);
     });
     
     try {
@@ -145,40 +153,35 @@ export async function initializeFirebase() {
           console.log("Firebase core services initialized");
         } catch (initError: any) {
           // Handle API key error gracefully
-          if (initError.message && initError.message.includes('API key')) {
+          if (initError.message && 
+             (initError.message.includes('API key') || 
+              initError.message.includes('INVALID_ARGUMENT'))) {
             console.warn("Firebase API key issue, switching to offline mode:", initError.message);
             return { app: null, db: null, offline: true };
           }
           throw initError;
         }
         
-        // Skip analytics in initial load to speed up initialization
+        // Skip analytics initialization entirely - it's causing many errors
         return { app, db };
       };
       
       // Race between initialization and timeout
       const result = await Promise.race([initPromise(), timeoutPromise]);
       
+      // Removed analytics initialization - too many errors
+
       // If initialization succeeded, initialize collections in background
-      if (result && db) {
-        // Initialize additional services in background
+      if (result && result.app && result.db) {
         setTimeout(() => {
-          // Initialize analytics only if we have time
-          if (typeof window !== 'undefined') {
-            import('firebase/analytics').then(({ getAnalytics }) => {
-              try {
-                getAnalytics(app);
-                console.log("Firebase Analytics initialized in background");
-              } catch (e) {
-                console.warn("Failed to initialize analytics, continuing without it");
-              }
-            }).catch(() => {});
-          }
-          
           // Initialize default data in background
-          initializeDefaultData().catch(err => {
-            console.warn("Default data initialization failed, using fallback data");
-          });
+          try {
+            initializeDefaultData().catch(err => {
+              console.warn("Default data initialization failed, using fallback data");
+            });
+          } catch (e) {
+            console.warn("Error in default data initialization", e);
+          }
         }, 100);
       }
       

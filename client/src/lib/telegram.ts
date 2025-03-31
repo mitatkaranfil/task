@@ -130,10 +130,22 @@ export function isTelegramWebApp(): boolean {
 // Initialize and setup the Telegram Mini App
 export function initializeTelegramApp(): {success: boolean, message: string} {
   console.log('Initializing Telegram WebApp');
+  // Önce bir kere başlatıldığını işaretlemek için global değişken
+  if ((window as any).__telegramWebAppInitialized) {
+    console.log('Telegram WebApp already initialized, skipping');
+    return {success: true, message: "Already initialized"};
+  }
+  
+  // Şimdi başlatıldı olarak işaretle
+  (window as any).__telegramWebAppInitialized = true;
+  
   try {
     // Check if we're actually in Telegram environment
     if (window.Telegram?.WebApp) {
-      // Inform Telegram that our app is ready
+      // İşlemlerin bittiğini bildirmeden önce konsolu temizleyelim
+      console.clear();
+      
+      // Inform Telegram that our app is ready - one time only
       try {
         window.Telegram.WebApp.ready();
         console.log('WebApp.ready() called');
@@ -142,43 +154,44 @@ export function initializeTelegramApp(): {success: boolean, message: string} {
         return {success: false, message: "Telegram WebApp API'sine erişilemedi"};
       }
       
+      // İşlem sayısını sınırla
+      let operationsCompleted = 0;
+      
       // Set theme colors only if supported by current WebApp version
       try {
-        // Check WebApp version before calling unsupported methods
-        const supportsColors = window.Telegram.WebApp.isVersionAtLeast('6.1');
-        if (supportsColors) {
-          window.Telegram.WebApp.setHeaderColor('#121212');
-          window.Telegram.WebApp.setBackgroundColor('#121212');
-          console.log('Theme colors set');
+        // We now call this only once at startup
+        if (typeof window.Telegram.WebApp.isVersionAtLeast === 'function') {
+          // Check version, but avoid using problematic methods in Web App v6.0
+          const isVersion61OrHigher = window.Telegram.WebApp.isVersionAtLeast('6.1');
+          if (isVersion61OrHigher) {
+            // In 6.1+ we can safely use these methods
+            try {
+              window.Telegram.WebApp.setHeaderColor('#121212');
+              window.Telegram.WebApp.setBackgroundColor('#121212');
+              console.log('Theme colors set - WebApp v6.1+');
+            } catch (e) {
+              console.warn('Failed to set colors despite version check:', e);
+            }
+          }
+          operationsCompleted++;
         } else {
-          console.log('Color setting not supported in this WebApp version, skipping');
+          console.log('isVersionAtLeast not available, skipping version-specific features');
         }
       } catch (colorError) {
-        console.warn('Error setting theme colors:', colorError);
-        // Not critical, continue
+        console.warn('Error with WebApp version check:', colorError);
       }
       
-      // Expand to take full screen if needed
+      // Expand to take full screen if needed - one time only
       try {
+        // We only want to expand once
         window.Telegram.WebApp.expand();
         console.log('WebApp.expand() called');
+        operationsCompleted++;
       } catch (expandError) {
         console.warn('Error calling WebApp.expand():', expandError);
-        // Not critical, continue
       }
       
-      // Add a single call to ready() after all setup is done
-      try {
-        // Small delay to ensure previous commands are processed
-        setTimeout(() => {
-          window.Telegram.WebApp.ready();
-          console.log('Final WebApp.ready() call to ensure initialization');
-        }, 50);
-      } catch (finalReadyError) {
-        console.warn('Error in final ready call:', finalReadyError);
-      }
-      
-      return {success: true, message: "Telegram WebApp bağlantısı başarılı"};
+      return {success: operationsCompleted > 0, message: "Telegram WebApp başlatıldı"};
     } else {
       console.log('Telegram WebApp not available, proceeding in development mode');
       return {success: import.meta.env.DEV, message: import.meta.env.DEV ? 

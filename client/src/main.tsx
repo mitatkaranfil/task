@@ -8,29 +8,42 @@ import { initializeTelegramApp } from "./lib/telegram";
 console.log("Main.tsx - Starting application initialization");
 try {
   console.log("Main.tsx - Calling initializeTelegramApp");
-  initializeTelegramApp();
+  const initResult = initializeTelegramApp();
+  console.log("Telegram initialization result:", initResult);
 } catch (error) {
   console.error("Main.tsx - Error initializing Telegram app:", error);
 }
 
-// Ensure we're not calling createRoot multiple times on the same container
+// Global değişken olarak root'u tanımla
 let root: ReactDOM.Root | null = null;
-const rootElement = document.getElementById("root");
 
-if (rootElement) {
-  // Check if we already have a root associated with this container
-  if (!(rootElement as any).__reactContainer$) {
-    root = ReactDOM.createRoot(rootElement);
+// Render fonksiyonu - tek bir yerden render etmek için
+function renderApp() {
+  const rootElement = document.getElementById("root");
+  
+  if (!rootElement) {
+    console.error("Root element not found");
+    return;
   }
-
-  // Only render if we successfully created a new root
-  if (root) {
-    root.render(
-      <React.StrictMode>
-        <App />
-      </React.StrictMode>
-    );
+  
+  // Eğer halihazırda bir root varsa, tekrar oluşturmamak için kontrol et
+  if (!(rootElement as any).__reactContainer$) {
+    console.log("Creating new React root");
+    try {
+      root = ReactDOM.createRoot(rootElement);
+      
+      root.render(
+        <React.StrictMode>
+          <App />
+        </React.StrictMode>
+      );
+    } catch (error) {
+      console.error("Error creating React root:", error);
+    }
   } else {
     console.warn("App already rendered, skipping duplicate render");
   }
 }
+
+// Uygulamayı render et
+renderApp();

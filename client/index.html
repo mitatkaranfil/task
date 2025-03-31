@@ -9,13 +9,18 @@
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#121212" />
     <title>Task Boost</title>
+    
     <!-- Preload Telegram WebApp script to ensure it's available before our app loads -->
-    <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
     <!-- Icon fonts -->
-    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css"></noscript>
+    
     <!-- Preconnect to Firebase domain -->
     <link rel="preconnect" href="https://firebaseinstallations.googleapis.com">
     <link rel="preconnect" href="https://firestore.googleapis.com">
+    
     <style>
       :root {
         --primary: 221 83% 53%;
@@ -76,6 +81,20 @@
       .hide-scrollbar {
         -ms-overflow-style: none;
         scrollbar-width: none;
+      }
+      
+      /* Telegram yükleme stili */
+      #telegram-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: hsl(var(--background));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
       }
     </style>
   </head>
