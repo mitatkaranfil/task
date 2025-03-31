@@ -22,13 +22,45 @@ export const useTasks = () => {
       try {
         setIsLoading(true);
         
-        // Get all tasks
-        const allTasks = await getTasks();
-        setTasks(allTasks);
+        // Get all tasks using API endpoint instead of Firebase
+        try {
+          console.log("Trying to load tasks from API");
+          const response = await fetch("/api/tasks");
+          if (response.ok) {
+            const tasksData = await response.json();
+            console.log("Tasks loaded from API:", tasksData);
+            setTasks(tasksData);
+          } else {
+            console.warn("Failed to load tasks from API, falling back to Firebase");
+            // Fallback to Firebase
+            const allTasks = await getTasks();
+            setTasks(allTasks);
+          }
+        } catch (apiError) {
+          console.warn("API error loading tasks, falling back to Firebase:", apiError);
+          const allTasks = await getTasks();
+          setTasks(allTasks);
+        }
         
         // Get user's progress on tasks
-        const userTasksData = await getUserTasks(user.id);
-        setUserTasks(userTasksData);
+        try {
+          console.log("Trying to load user tasks from API");
+          const response = await fetch(`/api/users/${user.id}/tasks`);
+          if (response.ok) {
+            const userTasksData = await response.json();
+            console.log("User tasks loaded from API:", userTasksData);
+            setUserTasks(userTasksData);
+          } else {
+            console.warn("Failed to load user tasks from API, falling back to Firebase");
+            // Fallback to Firebase
+            const userTasksData = await getUserTasks(user.id);
+            setUserTasks(userTasksData);
+          }
+        } catch (apiError) {
+          console.warn("API error loading user tasks, falling back to Firebase:", apiError);
+          const userTasksData = await getUserTasks(user.id);
+          setUserTasks(userTasksData);
+        }
         
       } catch (error) {
         console.error("Error loading tasks:", error);
@@ -43,7 +75,7 @@ export const useTasks = () => {
     };
     
     loadTasks();
-  }, [user]);
+  }, [user, toast]);
   
   // Filter tasks based on active filter
   const filteredTasks = tasks.filter(task => {
@@ -61,18 +93,53 @@ export const useTasks = () => {
     if (!user) return;
     
     try {
+      console.log("Handling task action for task:", task);
+      
       // Handle different task actions
       switch (task.telegramAction) {
         case "open_app":
           // Auto-complete this task as the app is already open
-          await updateUserTaskProgress(user.id, task.id, task.requiredAmount);
-          await refreshUser();
-          hapticFeedback("success");
-          toast({
-            title: "Görev Tamamlandı",
-            description: `${task.points} puan kazandınız!`,
-            variant: "default"
-          });
+          try {
+            console.log("Trying to update task progress via API");
+            const response = await fetch(`/api/users/${user.id}/tasks/${task.id}/progress`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ progress: task.requiredAmount }),
+            });
+            
+            if (response.ok) {
+              console.log("Task progress updated via API");
+              await refreshUser();
+              hapticFeedback("success");
+              toast({
+                title: "Görev Tamamlandı",
+                description: `${task.points} puan kazandınız!`,
+                variant: "default"
+              });
+            } else {
+              console.warn("Failed to update task progress via API, falling back to Firebase");
+              await updateUserTaskProgress(user.id, task.id, task.requiredAmount);
+              await refreshUser();
+              hapticFeedback("success");
+              toast({
+                title: "Görev Tamamlandı",
+                description: `${task.points} puan kazandınız!`,
+                variant: "default"
+              });
+            }
+          } catch (apiError) {
+            console.warn("API error updating task progress, falling back to Firebase:", apiError);
+            await updateUserTaskProgress(user.id, task.id, task.requiredAmount);
+            await refreshUser();
+            hapticFeedback("success");
+            toast({
+              title: "Görev Tamamlandı",
+              description: `${task.points} puan kazandınız!`,
+              variant: "default"
+            });
+          }
           break;
           
         case "send_message":
@@ -96,8 +163,23 @@ export const useTasks = () => {
       }
       
       // Update user tasks after task action
-      const updatedUserTasks = await getUserTasks(user.id);
-      setUserTasks(updatedUserTasks);
+      try {
+        console.log("Trying to reload user tasks from API after action");
+        const response = await fetch(`/api/users/${user.id}/tasks`);
+        if (response.ok) {
+          const userTasksData = await response.json();
+          console.log("User tasks reloaded from API:", userTasksData);
+          setUserTasks(userTasksData);
+        } else {
+          console.warn("Failed to reload user tasks from API, falling back to Firebase");
+          const updatedUserTasks = await getUserTasks(user.id);
+          setUserTasks(updatedUserTasks);
+        }
+      } catch (apiError) {
+        console.warn("API error reloading user tasks, falling back to Firebase:", apiError);
+        const updatedUserTasks = await getUserTasks(user.id);
+        setUserTasks(updatedUserTasks);
+      }
       
     } catch (error) {
       console.error("Error handling task action:", error);

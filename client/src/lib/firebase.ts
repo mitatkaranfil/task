@@ -36,8 +36,8 @@ let db: any;
 
 // Initialize Firebase
 export async function initializeFirebase() {
-  // Düzeltme: storageBucket değeri doğru değil, düzeltilmeli
-  if (firebaseConfig.storageBucket === "G-TVFJE9FDHS") {
+  // Ensure storageBucket value is correct
+  if (!firebaseConfig.storageBucket || firebaseConfig.storageBucket === "G-TVFJE9FDHS") {
     firebaseConfig.storageBucket = "cosmofy-c0363.appspot.com";
     console.log("Fixed incorrect storageBucket value");
   }

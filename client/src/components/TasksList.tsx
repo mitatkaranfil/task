@@ -15,6 +15,8 @@ const TasksList: React.FC = () => {
     handleTaskAction 
   } = useTasks();
   
+  console.log("Tasks in TasksList:", tasks);
+  
   // Handle filter change
   const changeFilter = (filter: TaskFilter) => {
     setActiveFilter(filter);
