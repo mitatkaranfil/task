@@ -48,12 +48,22 @@ const Profile: React.FC = () => {
   const shareReferralLink = () => {
     if (!user) return;
     
-    const referralData = JSON.stringify({
-      type: "referral",
-      code: user.referralCode
-    });
+    // Create Telegram app link with startapp parameter containing user's Telegram ID
+    const telegramLink = `https://t.me/cosmofy_bot/app?startapp=${user.telegramId}`;
     
-    shareWithTelegram(referralData);
+    // Create share message
+    const shareMessage = `🚀 Cosmofy ile madencilik oyununa katıl ve birlikte kripto kazan!\n\nBu linkten katıl: ${telegramLink}`;
+    
+    // Share with Telegram
+    try {
+      shareWithTelegram(shareMessage);
+    } catch (error) {
+      console.error("Error sharing referral link:", error);
+      // Fallback to clipboard
+      navigator.clipboard.writeText(shareMessage)
+        .then(() => showAlert("Referans linki kopyalandı!"))
+        .catch(() => showAlert("Referans linki paylaşılamadı."));
+    }
   };
   
   if (!user) return null;
@@ -130,14 +140,18 @@ const Profile: React.FC = () => {
           </p>
           
           <div className="bg-dark-lighter rounded-lg p-3 mb-4">
-            <div className="text-xs text-gray-400 mb-1">Referans Kodun</div>
+            <div className="text-xs text-gray-400 mb-1">Referans Linkin</div>
             <div className="flex items-center justify-between">
-              <code className="font-mono bg-dark p-2 rounded text-primary flex-1 overflow-x-auto">
-                {user.referralCode}
+              <code className="font-mono bg-dark p-2 rounded text-primary flex-1 overflow-x-auto text-xs">
+                https://t.me/cosmofy_bot/app?startapp={user.telegramId}
               </code>
               <button 
                 className="ml-2 p-2 bg-primary/20 text-primary rounded"
-                onClick={copyReferralCode}
+                onClick={() => {
+                  navigator.clipboard.writeText(`https://t.me/cosmofy_bot/app?startapp=${user.telegramId}`)
+                    .then(() => showAlert("Referans linki kopyalandı!"))
+                    .catch(() => showAlert("Kopyalama başarısız. Lütfen manuel olarak kopyalayın."));
+                }}
               >
                 <i className="ri-file-copy-line"></i>
               </button>

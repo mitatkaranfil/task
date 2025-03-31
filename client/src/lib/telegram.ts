@@ -400,7 +400,30 @@ export function openInvoice(url: string): Promise<string> {
 // Share data with Telegram (like referral code)
 export function shareWithTelegram(data: string): void {
   if (isTelegramWebApp()) {
-    window.Telegram.WebApp.sendData(data);
+    try {
+      if (typeof data === 'string') {
+        // Check if the data appears to be a message (not a JSON object)
+        const isMessage = data.includes(' ') || (!data.startsWith('{') && !data.startsWith('['));
+        
+        if (isMessage) {
+          // It's a message, use openLink to open the share dialog
+          console.log('Sharing message using Telegram share dialog');
+          const encodedText = encodeURIComponent(data);
+          const shareUrl = `https://t.me/share/url?url=&text=${encodedText}`;
+          window.Telegram.WebApp.openLink(shareUrl);
+        } else {
+          // It's likely a JSON object, use sendData
+          console.log('Sending data to Telegram Bot');
+          window.Telegram.WebApp.sendData(data);
+        }
+      } else {
+        // Fallback to sendData for any other case
+        console.log('Sending data to Telegram Bot (fallback)');
+        window.Telegram.WebApp.sendData(data);
+      }
+    } catch (error) {
+      console.error('Error sharing with Telegram:', error);
+    }
   } else {
     console.warn('Sharing not available outside WebApp');
   }
