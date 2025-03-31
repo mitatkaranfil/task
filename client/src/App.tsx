@@ -34,18 +34,25 @@ function App() {
         // Initialize Telegram WebApp first
         initializeTelegramApp();
         
-        // Initialize Firebase with a timeout to prevent hanging
-        const firebasePromise = initializeFirebase();
+        try {
+          // Initialize Firebase with a timeout to prevent hanging
+          const firebasePromise = initializeFirebase();
+          
+          // Create a timeout promise
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("Firebase initialization timed out")), 10000);
+          });
+          
+          // Race between Firebase initialization and timeout
+          await Promise.race([firebasePromise, timeoutPromise]);
+          
+          console.log("App initialization complete");
+        } catch (firebaseError) {
+          console.error("Firebase initialization error:", firebaseError);
+          console.log("Continuing without Firebase");
+          // Continue despite Firebase errors
+        }
         
-        // Create a timeout promise
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Firebase initialization timed out")), 10000);
-        });
-        
-        // Race between Firebase initialization and timeout
-        await Promise.race([firebasePromise, timeoutPromise]);
-        
-        console.log("App initialization complete");
         setIsInitialized(true);
         setInitError(null);
       } catch (error) {

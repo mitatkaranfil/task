@@ -21,32 +21,73 @@ import { User, Task, BoostType, UserBoost, UserTask, Referral } from "@/types";
 // Firebase varsayılan yapılandırması - geliştirme için
 // Üretimde gerçek değerleri kullanmak için .env dosyasına ilgili değişkenleri ekleyin
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, 
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDkfIJNpO_6dWSLm6jrfxr7-Pg1ysNMGiE",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "cosmofy-c0363.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "cosmofy-c0363",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "cosmofy-c0363.appspot.com", 
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "738428383994",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:738428383994:web:e2bde1f0e47da6a7a79d89",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-TVFJE9FDHS"
 };
 
 // Firebase app instance
 let app: any;
 let db: any;
 
+// Fallback data for when Firebase is unavailable
+const fallbackData = {
+  users: [],
+  tasks: [
+    {
+      id: "fallback-task-1",
+      title: "Uygulamayı Aç",
+      description: "Uygulamayı günde bir kez aç",
+      type: "daily",
+      points: 10,
+      requiredAmount: 1,
+      isActive: true,
+      telegramAction: "open_app",
+      telegramTarget: null,
+      createdAt: new Date()
+    },
+    {
+      id: "fallback-task-2",
+      title: "Gruba Katıl",
+      description: "Telegram grubuna katıl",
+      type: "special",
+      points: 50,
+      requiredAmount: 1,
+      isActive: true,
+      telegramAction: "join_group",
+      telegramTarget: "@mining_group",
+      createdAt: new Date()
+    }
+  ],
+  boostTypes: [
+    {
+      id: "fallback-boost-1",
+      name: "Hız Boost",
+      description: "Kazım hızını 24 saat boyunca 1.5x artır",
+      multiplier: 150,
+      durationHours: 24,
+      price: 500,
+      isActive: true,
+      iconName: "rocket",
+      colorClass: "blue",
+      isPopular: false,
+      createdAt: new Date()
+    }
+  ]
+};
+
 // Initialize Firebase
 export async function initializeFirebase() {
-  // Ensure storageBucket value is correct
-  if (!firebaseConfig.storageBucket || firebaseConfig.storageBucket === "G-TVFJE9FDHS") {
-    firebaseConfig.storageBucket = "cosmofy-c0363.appspot.com";
-    console.log("Fixed incorrect storageBucket value");
-  }
-  
-  console.log("Initializing Firebase with config:", JSON.stringify({
-    ...firebaseConfig,
-    apiKey: "***" // Masking API key for logs
-  }));
   try {
+    console.log("Initializing Firebase with config:", JSON.stringify({
+      ...firebaseConfig,
+      apiKey: "***" // Masking API key for logs
+    }));
+    
     if (!app) {
       console.log("Creating Firebase app instance");
       
@@ -59,17 +100,7 @@ export async function initializeFirebase() {
         console.log("Firebase and Firestore initialized successfully");
       } catch (initError) {
         console.error("Error during Firebase initialization:", initError);
-        // Try to delete any existing app and reinitialize
-        try {
-          const { deleteApp } = await import('firebase/app');
-          await deleteApp(app);
-          app = initializeApp(firebaseConfig);
-          db = getFirestore(app);
-          console.log("Firebase reinitialized after error");
-        } catch (reinitError) {
-          console.error("Error during Firebase reinitialization:", reinitError);
-          throw reinitError;
-        }
+        throw new Error("Firebase initialization failed");
       }
       
       // Analytics is only available in browser environment
@@ -85,9 +116,14 @@ export async function initializeFirebase() {
       }
       
       // Initialize collections with default data if needed
-      console.log("Initializing default data");
-      await initializeDefaultData();
-      console.log("Default data initialization completed");
+      try {
+        console.log("Initializing default data");
+        await initializeDefaultData();
+        console.log("Default data initialization completed");
+      } catch (dataError) {
+        console.error("Error initializing default data:", dataError);
+        // Continue despite data initialization errors
+      }
     } else {
       console.log("Firebase already initialized");
     }
@@ -100,126 +136,142 @@ export async function initializeFirebase() {
 
 // Initialize default data (tasks, boost types)
 async function initializeDefaultData() {
-  // Check if boost types exist, if not create defaults
-  const boostTypesSnapshot = await getDocs(collection(db, "boostTypes"));
-  
-  if (boostTypesSnapshot.empty) {
-    // Default boost types
-    const defaultBoostTypes: Partial<BoostType>[] = [
-      {
-        name: "Hız Boost",
-        description: "Kazım hızını 24 saat boyunca 1.5x artır",
-        multiplier: 150, // 1.5x
-        durationHours: 24,
-        price: 500,
-        isActive: true,
-        iconName: "rocket",
-        colorClass: "blue",
-        isPopular: false
-      },
-      {
-        name: "Süper Boost",
-        description: "Kazım hızını 24 saat boyunca 2x artır",
-        multiplier: 200, // 2x
-        durationHours: 24,
-        price: 1000,
-        isActive: true,
-        iconName: "rocket",
-        colorClass: "purple",
-        isPopular: false
-      },
-      {
-        name: "Mega Boost",
-        description: "Kazım hızını 24 saat boyunca 3x artır",
-        multiplier: 300, // 3x
-        durationHours: 24,
-        price: 2000,
-        isActive: true,
-        iconName: "rocket",
-        colorClass: "yellow",
-        isPopular: false
-      },
-      {
-        name: "Ultra Boost",
-        description: "Kazım hızını 7 gün boyunca 2x artır",
-        multiplier: 200, // 2x
-        durationHours: 168, // 7 days
-        price: 5000,
-        isActive: true,
-        iconName: "rocket",
-        colorClass: "red",
-        isPopular: true
-      }
-    ];
-    
-    for (const boostType of defaultBoostTypes) {
-      await addDoc(collection(db, "boostTypes"), {
-        ...boostType,
-        createdAt: serverTimestamp()
-      });
-    }
+  if (!db) {
+    console.error("Firestore not initialized");
+    return;
   }
   
-  // Check if tasks exist, if not create defaults
-  const tasksSnapshot = await getDocs(collection(db, "tasks"));
-  
-  if (tasksSnapshot.empty) {
-    // Default tasks
-    const defaultTasks: Partial<Task>[] = [
-      {
-        title: "Uygulamayı Aç",
-        description: "Uygulamayı günde bir kez aç",
-        type: "daily",
-        points: 10,
-        requiredAmount: 1,
-        isActive: true,
-        telegramAction: "open_app",
-        telegramTarget: null
-      },
-      {
-        title: "Gruba Mesaj Gönder",
-        description: "Telegram grubuna en az 3 mesaj gönder",
-        type: "daily",
-        points: 50,
-        requiredAmount: 3,
-        isActive: true,
-        telegramAction: "send_message",
-        telegramTarget: "@mining_group"
-      },
-      {
-        title: "5 Arkadaş Davet Et",
-        description: "5 arkadaşını referans koduyla davet et",
-        type: "weekly",
-        points: 200,
-        requiredAmount: 5,
-        isActive: true,
-        telegramAction: "invite_friends",
-        telegramTarget: null
-      },
-      {
-        title: "Kanala Katıl",
-        description: "Resmi duyuru kanalımıza katıl",
-        type: "special",
-        points: 100,
-        requiredAmount: 1,
-        isActive: true,
-        telegramAction: "join_channel",
-        telegramTarget: "@mining_channel"
-      }
-    ];
+  try {
+    // Check if boost types exist, if not create defaults
+    const boostTypesSnapshot = await getDocs(collection(db, "boostTypes"));
     
-    for (const task of defaultTasks) {
-      await addDoc(collection(db, "tasks"), {
-        ...task,
-        createdAt: serverTimestamp()
-      });
+    if (boostTypesSnapshot.empty) {
+      // Default boost types
+      const defaultBoostTypes: Partial<BoostType>[] = [
+        {
+          name: "Hız Boost",
+          description: "Kazım hızını 24 saat boyunca 1.5x artır",
+          multiplier: 150, // 1.5x
+          durationHours: 24,
+          price: 500,
+          isActive: true,
+          iconName: "rocket",
+          colorClass: "blue",
+          isPopular: false
+        },
+        {
+          name: "Süper Boost",
+          description: "Kazım hızını 24 saat boyunca 2x artır",
+          multiplier: 200, // 2x
+          durationHours: 24,
+          price: 1000,
+          isActive: true,
+          iconName: "rocket",
+          colorClass: "purple",
+          isPopular: false
+        },
+        {
+          name: "Mega Boost",
+          description: "Kazım hızını 24 saat boyunca 3x artır",
+          multiplier: 300, // 3x
+          durationHours: 24,
+          price: 2000,
+          isActive: true,
+          iconName: "rocket",
+          colorClass: "yellow",
+          isPopular: false
+        },
+        {
+          name: "Ultra Boost",
+          description: "Kazım hızını 7 gün boyunca 2x artır",
+          multiplier: 200, // 2x
+          durationHours: 168, // 7 days
+          price: 5000,
+          isActive: true,
+          iconName: "rocket",
+          colorClass: "red",
+          isPopular: true
+        }
+      ];
+      
+      for (const boostType of defaultBoostTypes) {
+        await addDoc(collection(db, "boostTypes"), {
+          ...boostType,
+          createdAt: serverTimestamp()
+        });
+      }
     }
+    
+    // Check if tasks exist, if not create defaults
+    const tasksSnapshot = await getDocs(collection(db, "tasks"));
+    
+    if (tasksSnapshot.empty) {
+      // Default tasks
+      const defaultTasks: Partial<Task>[] = [
+        {
+          title: "Uygulamayı Aç",
+          description: "Uygulamayı günde bir kez aç",
+          type: "daily",
+          points: 10,
+          requiredAmount: 1,
+          isActive: true,
+          telegramAction: "open_app",
+          telegramTarget: null
+        },
+        {
+          title: "Gruba Mesaj Gönder",
+          description: "Telegram grubuna en az 3 mesaj gönder",
+          type: "daily",
+          points: 50,
+          requiredAmount: 3,
+          isActive: true,
+          telegramAction: "send_message",
+          telegramTarget: "@mining_group"
+        },
+        {
+          title: "5 Arkadaş Davet Et",
+          description: "5 arkadaşını referans koduyla davet et",
+          type: "weekly",
+          points: 200,
+          requiredAmount: 5,
+          isActive: true,
+          telegramAction: "invite_friends",
+          telegramTarget: null
+        },
+        {
+          title: "Kanala Katıl",
+          description: "Resmi duyuru kanalımıza katıl",
+          type: "special",
+          points: 100,
+          requiredAmount: 1,
+          isActive: true,
+          telegramAction: "join_channel",
+          telegramTarget: "@mining_channel"
+        }
+      ];
+      
+      for (const task of defaultTasks) {
+        await addDoc(collection(db, "tasks"), {
+          ...task,
+          createdAt: serverTimestamp()
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error in initializeDefaultData:", error);
+    throw error;
   }
 }
 
 // User related functions
 export async function getUserByTelegramId(telegramId: string): Promise<User | null> {
   try {
+    if (!db) {
+      console.error("Firestore not initialized");
+      window.location.href = "/fallback-no-records.html";
+      return null;
+    }
+    
     console.log("getUserByTelegramId - Looking for user with telegramId:", telegramId);
     
     const usersRef = collection(db, "users");
@@ -242,6 +294,8 @@ export async function getUserByTelegramId(telegramId: string): Promise<User | nu
     return null;
   } catch (error) {
     console.error("Error getting user by Telegram ID:", error);
+    // For Firebase errors, show fallback page
+    window.location.href = "/fallback-no-records.html";
     return null;
   }
 }

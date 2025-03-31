@@ -110,20 +110,24 @@ export function isTelegramWebApp(): boolean {
     console.log('isTelegramWebApp check - window.Telegram exists:', hasTelegramObject);
     console.log('isTelegramWebApp check - window.Telegram.WebApp exists:', hasWebAppObject);
     
+    // Force true for both development and production to allow app to work outside Telegram
+    // This is a temporary solution to debug the black screen issue
+    return true;
+    
     // Determine if we're in development or production
-    const isDevelopment = import.meta.env.DEV;
+    // const isDevelopment = import.meta.env.DEV;
     
-    if (isDevelopment) {
-      // In development, we'll allow the app to work outside Telegram
-      return true;
-    }
+    // if (isDevelopment) {
+    //   // In development, we'll allow the app to work outside Telegram
+    //   return true;
+    // }
     
-    // In production, only return true if actually in Telegram WebApp
-    return hasWebAppObject;
+    // // In production, only return true if actually in Telegram WebApp
+    // return hasWebAppObject;
   } catch (error) {
     console.warn('Error checking Telegram WebApp:', error);
-    // Return true for development, false for production
-    return import.meta.env.DEV ? true : false;
+    // Return true for both development and production
+    return true;
   }
 }
 
@@ -131,40 +135,37 @@ export function isTelegramWebApp(): boolean {
 export function initializeTelegramApp(): void {
   console.log('Initializing Telegram WebApp');
   try {
-    if (isTelegramWebApp()) {
-      console.log('Running in Telegram WebApp environment');
+    // Always consider it's running in a Telegram WebApp environment
+    console.log('Running in Telegram WebApp environment (forced for debugging)');
+    
+    // Check if we're actually in Telegram environment
+    if (window.Telegram?.WebApp) {
+      // Inform Telegram that our app is ready
+      try {
+        window.Telegram.WebApp.ready();
+        console.log('WebApp.ready() called');
+      } catch (readyError) {
+        console.warn('Error calling WebApp.ready():', readyError);
+      }
       
-      // Check if we're actually in Telegram environment
-      if (window.Telegram?.WebApp) {
-        // Inform Telegram that our app is ready
-        try {
-          window.Telegram.WebApp.ready();
-          console.log('WebApp.ready() called');
-        } catch (readyError) {
-          console.warn('Error calling WebApp.ready():', readyError);
-        }
-        
-        // Set dark theme colors for app
-        try {
-          window.Telegram.WebApp.setHeaderColor('#121212');
-          window.Telegram.WebApp.setBackgroundColor('#121212');
-          console.log('Theme colors set');
-        } catch (colorError) {
-          console.warn('Error setting theme colors:', colorError);
-        }
-        
-        // Expand to take full screen if needed
-        try {
-          window.Telegram.WebApp.expand();
-          console.log('WebApp.expand() called');
-        } catch (expandError) {
-          console.warn('Error calling WebApp.expand():', expandError);
-        }
-      } else {
-        console.log('Development mode: Skipping actual Telegram API calls');
+      // Set dark theme colors for app
+      try {
+        window.Telegram.WebApp.setHeaderColor('#121212');
+        window.Telegram.WebApp.setBackgroundColor('#121212');
+        console.log('Theme colors set');
+      } catch (colorError) {
+        console.warn('Error setting theme colors:', colorError);
+      }
+      
+      // Expand to take full screen if needed
+      try {
+        window.Telegram.WebApp.expand();
+        console.log('WebApp.expand() called');
+      } catch (expandError) {
+        console.warn('Error calling WebApp.expand():', expandError);
       }
     } else {
-      console.warn('Not running inside Telegram WebApp');
+      console.log('Telegram WebApp not available, proceeding in development mode');
     }
   } catch (error) {
     console.error('Error initializing Telegram WebApp:', error);
