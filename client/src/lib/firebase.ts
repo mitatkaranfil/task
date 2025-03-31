@@ -18,14 +18,16 @@ import {
 import { User, Task, BoostType, UserBoost, UserTask, Referral } from "@/types";
 
 // Firebase configuration
+// Firebase varsayılan yapılandırması - geliştirme için
+// Üretimde gerçek değerleri kullanmak için .env dosyasına ilgili değişkenleri ekleyin
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDaMZtW4JGDzBYLULJ-9LARgHI0LkwXYvs",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "cosmofy-c0363.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "cosmofy-c0363",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "cosmofy-c0363.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "494837128301",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:494837128301:web:9ee2265aa44e1687913364",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-TVFJE9FDHS"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, 
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Firebase app instance
@@ -34,6 +36,12 @@ let db: any;
 
 // Initialize Firebase
 export async function initializeFirebase() {
+  // Düzeltme: storageBucket değeri doğru değil, düzeltilmeli
+  if (firebaseConfig.storageBucket === "G-TVFJE9FDHS") {
+    firebaseConfig.storageBucket = "cosmofy-c0363.appspot.com";
+    console.log("Fixed incorrect storageBucket value");
+  }
+  
   console.log("Initializing Firebase with config:", JSON.stringify({
     ...firebaseConfig,
     apiKey: "***" // Masking API key for logs

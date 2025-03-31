@@ -9,6 +9,7 @@ import Admin from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 import LoadingScreen from "@/components/LoadingScreen";
 import { initializeFirebase } from "./lib/firebase";
+import { initializeTelegramApp } from "./lib/telegram";
 
 function Router() {
   return (
@@ -29,6 +30,9 @@ function App() {
     const init = async () => {
       try {
         console.log(`App initialization attempt ${retryCount + 1}`);
+        
+        // Initialize Telegram WebApp first
+        initializeTelegramApp();
         
         // Initialize Firebase with a timeout to prevent hanging
         const firebasePromise = initializeFirebase();
