@@ -32,66 +32,76 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeBoosts, setActiveBoosts] = useState<UserBoost[]>([]);
+  const [initAttempts, setInitAttempts] = useState(0);
 
   // Initialize user from Telegram
   useEffect(() => {
     const initUser = async () => {
       try {
         setIsLoading(true);
-        console.log("Initializing user");
+        console.log("UserContext - Initializing user, attempt:", initAttempts + 1);
         
         // Get URL parameters for referral
         const urlParams = new URLSearchParams(window.location.search);
         const referralCode = urlParams.get("ref");
         
-        console.log("About to authenticate with Telegram");
+        console.log("UserContext - About to authenticate with Telegram");
         // Authenticate with Telegram
         const authenticatedUser = await authenticateTelegramUser(referralCode || undefined);
         
-        console.log("Authentication result:", authenticatedUser ? "Success" : "Failed");
+        console.log("UserContext - Authentication result:", authenticatedUser ? "Success" : "Failed");
         
         if (!authenticatedUser) {
-          console.error("Authentication returned null user");
-          throw new Error("Authentication failed");
+          console.error("UserContext - Authentication returned null user");
+          
+          // If we failed to authenticate but have made less than 3 attempts,
+          // we'll try again in a moment (to give Telegram WebApp time to initialize)
+          if (initAttempts < 3) {
+            console.log(`UserContext - Retrying authentication (attempt ${initAttempts + 1}/3)`);
+            setInitAttempts(prev => prev + 1);
+            return; // Exit without setting isLoading to false
+          }
+          
+          throw new Error("Authentication failed after multiple attempts");
         }
         
         setUser(authenticatedUser);
-        console.log("User set:", authenticatedUser);
+        console.log("UserContext - User set:", authenticatedUser);
         
         // Load active boosts
         if (authenticatedUser.id) {
-          console.log("Loading boosts for user:", authenticatedUser.id);
+          console.log("UserContext - Loading boosts for user:", authenticatedUser.id);
           try {
             const boosts = await getUserActiveBoosts(authenticatedUser.id);
-            console.log("Loaded boosts:", boosts.length);
+            console.log("UserContext - Loaded boosts:", boosts.length);
             setActiveBoosts(boosts);
           } catch (boostErr) {
-            console.error("Error loading boosts:", boostErr);
+            console.error("UserContext - Error loading boosts:", boostErr);
           }
         }
         
         // Check for mining rewards
         if (authenticatedUser.lastMiningTime && isMiningAvailable(authenticatedUser.lastMiningTime as Date)) {
-          console.log("Claiming mining rewards");
+          console.log("UserContext - Claiming mining rewards");
           try {
             await claimMiningRewards(authenticatedUser);
-            console.log("Mining rewards claimed");
+            console.log("UserContext - Mining rewards claimed");
           } catch (miningErr) {
-            console.error("Error claiming mining rewards:", miningErr);
+            console.error("UserContext - Error claiming mining rewards:", miningErr);
           }
         }
         
       } catch (err) {
-        console.error("Error initializing user:", err);
+        console.error("UserContext - Error initializing user:", err);
         setError("Failed to initialize user");
       } finally {
-        console.log("User initialization completed");
+        console.log("UserContext - User initialization completed or failed after max attempts");
         setIsLoading(false);
       }
     };
 
     initUser();
-  }, []);
+  }, [initAttempts]); // Re-run when initAttempts changes
 
   // Check for mining rewards
   const claimMiningRewards = async (userToUpdate = user): Promise<boolean> => {

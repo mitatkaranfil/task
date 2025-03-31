@@ -112,16 +112,32 @@ export function isTelegramWebApp(): boolean {
 
 // Initialize and setup the Telegram Mini App
 export function initializeTelegramApp(): void {
-  if (isTelegramWebApp()) {
-    // Inform Telegram that our app is ready
-    window.Telegram.WebApp.ready();
-    // Set dark theme colors for app
-    window.Telegram.WebApp.setHeaderColor('#121212');
-    window.Telegram.WebApp.setBackgroundColor('#121212');
-    // Expand to take full screen if needed
-    window.Telegram.WebApp.expand();
-  } else {
-    console.warn('Not running inside Telegram WebApp');
+  console.log('Initializing Telegram WebApp');
+  try {
+    if (isTelegramWebApp()) {
+      console.log('Running in Telegram WebApp environment');
+      
+      // Inform Telegram that our app is ready
+      window.Telegram.WebApp.ready();
+      console.log('WebApp.ready() called');
+      
+      // Set dark theme colors for app
+      try {
+        window.Telegram.WebApp.setHeaderColor('#121212');
+        window.Telegram.WebApp.setBackgroundColor('#121212');
+        console.log('Theme colors set');
+      } catch (colorError) {
+        console.warn('Error setting theme colors:', colorError);
+      }
+      
+      // Expand to take full screen if needed
+      window.Telegram.WebApp.expand();
+      console.log('WebApp.expand() called');
+    } else {
+      console.warn('Not running inside Telegram WebApp');
+    }
+  } catch (error) {
+    console.error('Error initializing Telegram WebApp:', error);
   }
 }
 
@@ -134,9 +150,16 @@ export function getTelegramUser(): {
   photoUrl?: string;
 } | null {
   try {
+    console.log('Checking Telegram environment...');
+    console.log('isTelegramWebApp():', isTelegramWebApp());
+    console.log('window.Telegram exists:', !!window.Telegram);
+    console.log('window.Telegram?.WebApp exists:', !!window.Telegram?.WebApp);
+    console.log('initDataUnsafe exists:', !!window.Telegram?.WebApp?.initDataUnsafe);
+    console.log('user exists:', !!window.Telegram?.WebApp?.initDataUnsafe?.user);
+    
     if (!isTelegramWebApp() || !window.Telegram?.WebApp?.initDataUnsafe?.user) {
       // For development/testing when not in Telegram, return mock user
-      console.log('Using development test user');
+      console.log('Using development test user - No Telegram WebApp or user data available');
       return {
         telegramId: '123456789',
         firstName: 'Test',
@@ -147,6 +170,7 @@ export function getTelegramUser(): {
     }
 
     const user = window.Telegram.WebApp.initDataUnsafe.user;
+    console.log('Telegram user data found:', user);
 
     return {
       telegramId: user.id.toString(),
