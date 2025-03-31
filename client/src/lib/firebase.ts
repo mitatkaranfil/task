@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+// Analytics will be imported dynamically to avoid SSR issues
 import { 
   getFirestore, 
   collection, 
@@ -16,15 +17,15 @@ import {
 } from "firebase/firestore";
 import { User, Task, BoostType, UserBoost, UserTask, Referral } from "@/types";
 
-// Hardcoded Firebase config for development
-// In production, this should use environment variables
+// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDaMZtW4JGDzBYLULJ-9LARgHI0LkwXYvs",
   authDomain: "cosmofy-c0363.firebaseapp.com",
   projectId: "cosmofy-c0363",
-  storageBucket: "cosmofy-c0363.appspot.com",
+  storageBucket: "cosmofy-c0363.firebasestorage.app",
   messagingSenderId: "494837128301",
-  appId: "1:494837128301:web:9ee2265aa44e1687913364"
+  appId: "1:494837128301:web:9ee2265aa44e1687913364",
+  measurementId: "G-TVFJE9FDHS"
 };
 
 // Firebase app instance
@@ -33,14 +34,32 @@ let db: any;
 
 // Initialize Firebase
 export async function initializeFirebase() {
-  console.log("Initializing Firebase with config:", JSON.stringify(firebaseConfig));
+  console.log("Initializing Firebase with config:", JSON.stringify({
+    ...firebaseConfig,
+    apiKey: "***" // Masking API key for logs
+  }));
   try {
     if (!app) {
       console.log("Creating Firebase app instance");
+      
+      // Initialize Firebase with Analytics
       app = initializeApp(firebaseConfig);
+      
       console.log("Getting Firestore database");
       db = getFirestore(app);
       console.log("Firebase and Firestore initialized successfully");
+      
+      // Analytics is only available in browser environment
+      if (typeof window !== 'undefined') {
+        try {
+          // Lazy import Firebase Analytics to avoid server-side issues
+          const { getAnalytics } = await import('firebase/analytics');
+          getAnalytics(app);
+          console.log("Firebase Analytics initialized");
+        } catch (analyticsError) {
+          console.warn("Analytics initialization skipped:", analyticsError);
+        }
+      }
       
       // Initialize collections with default data if needed
       console.log("Initializing default data");
