@@ -144,13 +144,68 @@ export const useTasks = () => {
           
         case "send_message":
           if (task.telegramTarget) {
-            openTelegramLink(task.telegramTarget);
+            try {
+              // Open the Telegram link and attempt to mark as complete
+              openTelegramLink(task.telegramTarget);
+              
+              // Update task progress
+              try {
+                const response = await fetch(`/api/users/${user.id}/tasks/${task.id}/progress`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ progress: 1 }), // Increment by 1
+                });
+                
+                if (response.ok) {
+                  console.log(`Task progress updated for ${task.telegramAction}`);
+                  toast({
+                    title: "Görev İlerlemesi",
+                    description: "Görev ilerlemesi güncellendi.",
+                  });
+                  await refreshUser();
+                }
+              } catch (progressError) {
+                console.error("Error updating task progress:", progressError);
+              }
+            } catch (linkError) {
+              console.error("Error opening Telegram link:", linkError);
+            }
           }
           break;
           
         case "join_channel":
           if (task.telegramTarget) {
-            openTelegramLink(task.telegramTarget);
+            try {
+              console.log("Opening channel link:", task.telegramTarget);
+              
+              // Open the Telegram link
+              openTelegramLink(task.telegramTarget);
+              
+              // Mark task as complete
+              try {
+                // Complete the task directly
+                await fetch(`/api/users/${user.id}/tasks/${task.id}/progress`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ progress: task.requiredAmount }),
+                });
+                
+                toast({
+                  title: "Görev Tamamlanıyor",
+                  description: "Kanala katıldıktan sonra görev tamamlanacak",
+                });
+                
+                await refreshUser();
+              } catch (progressError) {
+                console.error("Error updating channel join task progress:", progressError);
+              }
+            } catch (linkError) {
+              console.error("Error opening Telegram channel link:", linkError);
+            }
           }
           break;
           

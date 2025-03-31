@@ -351,10 +351,35 @@ export function showConfirm(message: string): Promise<boolean> {
 
 // Open a Telegram channel or group
 export function openTelegramLink(link: string): void {
-  if (isTelegramWebApp()) {
-    window.Telegram.WebApp.openTelegramLink(link);
-  } else {
-    window.open(link, '_blank');
+  try {
+    console.log('Opening Telegram link:', link);
+    
+    // Make sure the link is properly formatted
+    if (!link.startsWith('https://t.me/')) {
+      // Handle links that start with @
+      if (link.startsWith('@')) {
+        link = 'https://t.me/' + link.substring(1);
+      } else {
+        link = 'https://t.me/' + link;
+      }
+    }
+    
+    console.log('Formatted link:', link);
+    
+    if (isTelegramWebApp() && window.Telegram?.WebApp) {
+      window.Telegram.WebApp.openLink(link);
+    } else {
+      window.open(link, '_blank');
+    }
+  } catch (error) {
+    console.error('Error opening Telegram link:', error);
+    
+    // Fallback
+    try {
+      window.open(link, '_blank');
+    } catch (fallbackError) {
+      console.error('Fallback error:', fallbackError);
+    }
   }
 }
 

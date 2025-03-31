@@ -91,11 +91,52 @@ const Admin: React.FC = () => {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const tasksData = await getAllTasks();
-      const boostsData = await getAllBoostTypes();
+      console.log("Loading admin data...");
       
-      setTasks(tasksData);
-      setBoosts(boostsData);
+      // Try API first
+      try {
+        console.log("Trying to load tasks from API");
+        const response = await fetch("/api/admin/tasks");
+        if (response.ok) {
+          const tasksData = await response.json();
+          console.log("Tasks loaded from API:", tasksData);
+          setTasks(tasksData);
+        } else {
+          console.warn("Failed to load tasks from API, falling back to Firebase");
+          // Fallback to Firebase
+          const tasksData = await getAllTasks();
+          console.log("Tasks loaded from Firebase:", tasksData);
+          setTasks(tasksData);
+        }
+      } catch (apiError) {
+        console.warn("API error loading tasks, falling back to Firebase:", apiError);
+        const tasksData = await getAllTasks();
+        console.log("Tasks loaded from Firebase:", tasksData);
+        setTasks(tasksData);
+      }
+      
+      // Try API for boosts
+      try {
+        console.log("Trying to load boosts from API");
+        const response = await fetch("/api/admin/boosts");
+        if (response.ok) {
+          const boostsData = await response.json();
+          console.log("Boosts loaded from API:", boostsData);
+          setBoosts(boostsData);
+        } else {
+          console.warn("Failed to load boosts from API, falling back to Firebase");
+          // Fallback to Firebase
+          const boostsData = await getAllBoostTypes();
+          console.log("Boosts loaded from Firebase:", boostsData);
+          setBoosts(boostsData);
+        }
+      } catch (apiError) {
+        console.warn("API error loading boosts, falling back to Firebase:", apiError);
+        const boostsData = await getAllBoostTypes();
+        console.log("Boosts loaded from Firebase:", boostsData);
+        setBoosts(boostsData);
+      }
+      
     } catch (error) {
       console.error("Error loading admin data:", error);
       toast({
