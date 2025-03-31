@@ -19,12 +19,12 @@ import { User, Task, BoostType, UserBoost, UserTask, Referral } from "@/types";
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDaMZtW4JGDzBYLULJ-9LARgHI0LkwXYvs",
-  authDomain: "cosmofy-c0363.firebaseapp.com",
-  projectId: "cosmofy-c0363",
-  storageBucket: "cosmofy-c0363.firebasestorage.app",
-  messagingSenderId: "494837128301",
-  appId: "1:494837128301:web:9ee2265aa44e1687913364",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDaMZtW4JGDzBYLULJ-9LARgHI0LkwXYvs",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "cosmofy-c0363.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "cosmofy-c0363",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "cosmofy-c0363.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "494837128301",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:494837128301:web:9ee2265aa44e1687913364",
   measurementId: "G-TVFJE9FDHS"
 };
 
@@ -42,12 +42,27 @@ export async function initializeFirebase() {
     if (!app) {
       console.log("Creating Firebase app instance");
       
-      // Initialize Firebase with Analytics
-      app = initializeApp(firebaseConfig);
-      
-      console.log("Getting Firestore database");
-      db = getFirestore(app);
-      console.log("Firebase and Firestore initialized successfully");
+      try {
+        // Initialize Firebase with Analytics
+        app = initializeApp(firebaseConfig);
+        
+        console.log("Getting Firestore database");
+        db = getFirestore(app);
+        console.log("Firebase and Firestore initialized successfully");
+      } catch (initError) {
+        console.error("Error during Firebase initialization:", initError);
+        // Try to delete any existing app and reinitialize
+        try {
+          const { deleteApp } = await import('firebase/app');
+          await deleteApp(app);
+          app = initializeApp(firebaseConfig);
+          db = getFirestore(app);
+          console.log("Firebase reinitialized after error");
+        } catch (reinitError) {
+          console.error("Error during Firebase reinitialization:", reinitError);
+          throw reinitError;
+        }
+      }
       
       // Analytics is only available in browser environment
       if (typeof window !== 'undefined') {

@@ -35,8 +35,10 @@ export function calculateMiningSpeed(baseMiningSpeed: number, activeBoosts: User
   
   // Apply each boost multiplier
   activeBoosts.forEach(boost => {
-    const multiplier = boost.boostType.multiplier / 100;
-    finalSpeed = Math.floor(finalSpeed * multiplier);
+    if (boost.boostType) {
+      const multiplier = boost.boostType.multiplier / 100;
+      finalSpeed = Math.floor(finalSpeed * multiplier);
+    }
   });
   
   return finalSpeed;
