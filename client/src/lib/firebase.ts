@@ -305,9 +305,15 @@ export async function createUser(userData: Partial<User>): Promise<User | null> 
     console.log("createUser - Creating new user with data:", userData);
     const usersRef = collection(db, "users");
     
+    // Fix for referredBy field - ensure it's never undefined
+    const sanitizedUserData = {
+      ...userData,
+      referredBy: userData.referredBy || null // Convert undefined to null
+    };
+    
     // Default user values
     const newUser = {
-      ...userData,
+      ...sanitizedUserData,
       level: 1,
       points: 0,
       miningSpeed: 10,

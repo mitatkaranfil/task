@@ -8,7 +8,8 @@
 
 [build.environment]
   NODE_VERSION = "18"
-  NODE_ENV = "production"
+  NODE_ENV = "development"
+  NPM_CONFIG_PRODUCTION = "false"
   VITE_FIREBASE_API_KEY = "AIzaSyDkfIJNpO_6dWSLm6jrfxr7-Pg1ysNMGiE"
   VITE_FIREBASE_AUTH_DOMAIN = "cosmofy-c0363.firebaseapp.com"
   VITE_FIREBASE_PROJECT_ID = "cosmofy-c0363"
@@ -17,6 +18,8 @@
   VITE_FIREBASE_APP_ID = "1:738428383994:web:e2bde1f0e47da6a7a79d89"
   VITE_FIREBASE_MEASUREMENT_ID = "G-TVFJE9FDHS"
   VITE_API_URL = "https://api.telegram.org/bot7574409548:AAFcxOWeU0OiNZeAaUtKOCnvu6kX7XMmqJM"
+  VITE_TELEGRAM_DEBUG = "true"
+  VITE_DEFAULT_REFERRER = "system"
 
 [[headers]]
   for = "/*"

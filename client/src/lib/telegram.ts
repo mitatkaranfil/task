@@ -262,7 +262,8 @@ export async function authenticateTelegramUser(referralCode?: string): Promise<U
           username: telegramUser.username,
           photoUrl: telegramUser.photoUrl,
           referralCode: newReferralCode,
-          referredBy: referralCode
+          // Ensure referredBy is never undefined
+          referredBy: referralCode || null
         };
         
         console.log('Creating user with data via API:', userData);
@@ -305,7 +306,8 @@ export async function authenticateTelegramUser(referralCode?: string): Promise<U
         username: telegramUser.username,
         photoUrl: telegramUser.photoUrl,
         referralCode: newReferralCode,
-        referredBy: referralCode
+        // Ensure referredBy is never undefined
+        referredBy: referralCode || null
       };
       
       console.log('Creating user with data:', userData);

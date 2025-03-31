@@ -13,7 +13,7 @@ export interface User {
   miningSpeed: number;
   lastMiningTime: Timestamp | Date;
   referralCode: string;
-  referredBy?: string;
+  referredBy?: string | null;
   joinDate: Timestamp | Date;
   completedTasksCount: number;
   boostUsageCount: number;
